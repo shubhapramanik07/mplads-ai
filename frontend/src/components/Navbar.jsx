@@ -43,12 +43,12 @@ export default function Navbar({
     { id: 'mp', label: 'Member of Parliament', subtitle: 'Constituency Work Monitoring', icon: UserCheck, color: 'bg-purple-600' },
   ];
 
-  // AI Model Lab has been completely removed as requested
+  // User Requirement: "remove analytics from all except ministry"
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'projects', label: 'Projects', icon: FolderGit2 },
     { id: 'alerts', label: 'AI Alerts', icon: AlertTriangle, badge: alertCount > 0 ? `${alertCount}` : null },
-    { id: 'analytics', label: 'Analytics', icon: LineChart },
+    ...(currentRole === 'ministry' ? [{ id: 'analytics', label: 'Analytics', icon: LineChart }] : []),
     { id: 'map', label: 'Project Map', icon: MapPin },
     { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
   ];
@@ -56,6 +56,14 @@ export default function Navbar({
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (onGlobalSearch) onGlobalSearch(searchInput);
+  };
+
+  const getCleanUserLabel = () => {
+    if (currentRole === 'ministry') return 'Central Ministry Official';
+    if (currentRole === 'state') return `State Nodal Officer (${selectedScope?.state || 'State'})`;
+    if (currentRole === 'district') return `District Authority (${selectedScope?.district || 'District'})`;
+    if (currentRole === 'mp') return 'Member of Parliament';
+    return 'Authenticated Officer';
   };
 
   return (
@@ -125,7 +133,7 @@ export default function Navbar({
               </div>
               <div className="hidden sm:block">
                 <div className="text-[10px] font-bold text-slate-400 uppercase leading-none">
-                  {authUser?.name || 'Authenticated Officer'}
+                  {getCleanUserLabel()}
                 </div>
                 <div className="text-xs font-black text-slate-900 flex items-center gap-1">
                   <span>{roles.find(r => r.id === currentRole)?.label}</span>
@@ -138,7 +146,7 @@ export default function Navbar({
             {roleDropdownOpen && (
               <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-fadeIn">
                 <div className="px-4 py-2 border-b border-slate-100">
-                  <div className="text-xs font-extrabold text-slate-900">Switch Monitoring Role</div>
+                  <div className="text-xs font-extrabold text-slate-900">Switch Authority View</div>
                   <div className="text-[11px] text-slate-400">Select authority view to simulate live workflow</div>
                 </div>
 
@@ -251,7 +259,7 @@ export default function Navbar({
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 bg-purple-100 text-purple-900 rounded-md font-extrabold flex items-center gap-1.5">
                 <UserCheck className="w-3.5 h-3.5" />
-                <span>Constituency Portfolio: {selectedScope.mpName || 'Dr Sukanta Majumdar'}</span>
+                <span>Constituency Portfolio</span>
               </span>
 
               <select

@@ -13,7 +13,8 @@ import {
   Filter,
   Eye,
   SlidersHorizontal,
-  ChevronRight
+  ChevronRight,
+  MapPin
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -116,11 +117,18 @@ export default function RoleDashboardView({
               <UserCheck className="w-4 h-4" />
               <span>Member of Parliament (MP) Constituency Portfolio</span>
             </div>
-            <h2 className="text-xl font-black text-slate-900 mt-1">{selectedScope.mpName || 'Honorable Member of Parliament'}</h2>
+            <h2 className="text-xl font-black text-slate-900 mt-1">{selectedScope.mpName || 'Constituency MP Portfolio'}</h2>
             <p className="text-xs text-slate-500 mt-0.5">Constituency Project Monitoring, Fund Utilization & Vigilance Tracking</p>
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => onNavigate('map')}
+              className="px-4 py-2 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2"
+            >
+              <MapPin className="w-4 h-4 text-amber-400" />
+              <span>Open Constituency Map</span>
+            </button>
             <button
               onClick={() => onNavigate('alerts')}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2"
@@ -143,44 +151,20 @@ export default function RoleDashboardView({
           <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Flagged for Verification" color="red" badge={summary?.high_risk_projects > 0 ? "Review" : null} />
         </div>
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Monthly Expenditure Trend */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-            <h3 className="text-sm font-extrabold text-slate-900 mb-1">Monthly Completion & Expenditure Velocity</h3>
-            <p className="text-xs text-slate-500 mb-4">Completed works expenditure trajectory over the last 12 months</p>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={analytics?.monthly_trend || []}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748B' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} unit="Cr" />
-                  <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#FFF', borderRadius: '8px', fontSize: '12px' }} />
-                  <Line type="monotone" dataKey="expenditure_crores" stroke="#1A56DB" strokeWidth={2.5} name="Expenditure (₹ Cr)" dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Risk Distribution */}
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-            <h3 className="text-sm font-extrabold text-slate-900 mb-1">Constituency Risk Tier Distribution</h3>
-            <p className="text-xs text-slate-500 mb-4">Breakdown across Low (🟢 100% Completed), Medium, High and Critical Risk bands</p>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics?.risk_distribution || []}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748B' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#FFF', borderRadius: '8px', fontSize: '12px' }} />
-                  <Bar dataKey="count" fill="#1E3A8A" radius={[4, 4, 0, 0]}>
-                    {(analytics?.risk_distribution || []).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+        {/* Monthly Expenditure Trend */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-extrabold text-slate-900 mb-1">Monthly Completion & Expenditure Velocity</h3>
+          <p className="text-xs text-slate-500 mb-4">Completed works expenditure trajectory over the last 12 months</p>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={analytics?.monthly_trend || []}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748B' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748B' }} unit="Cr" />
+                <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#FFF', borderRadius: '8px', fontSize: '12px' }} />
+                <Line type="monotone" dataKey="expenditure_crores" stroke="#1A56DB" strokeWidth={2.5} name="Expenditure (₹ Cr)" dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -238,7 +222,7 @@ export default function RoleDashboardView({
                         className="px-3 py-1 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 mx-auto shadow-2xs"
                       >
                         <Eye className="w-3.5 h-3.5 text-amber-400" />
-                        <span>View Details</span>
+                        <span>Inspect</span>
                       </button>
                     </td>
                   </tr>
@@ -252,7 +236,7 @@ export default function RoleDashboardView({
   }
 
   // ----------------------------------------------------
-  // 2. DISTRICT AUTHORITY DASHBOARD (MOST DETAILED)
+  // 2. DISTRICT AUTHORITY DASHBOARD
   // ----------------------------------------------------
   if (currentRole === 'district') {
     return (
@@ -270,13 +254,15 @@ export default function RoleDashboardView({
             <p className="text-xs text-slate-500 mt-0.5">Project-wise physical verification, financial tracking, and tender anomaly auditing</p>
           </div>
 
-          <button
-            onClick={() => onNavigate('projects')}
-            className="px-4 py-2 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 shrink-0"
-          >
-            <span>Full Project Directory</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => onNavigate('map')}
+              className="px-4 py-2 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2"
+            >
+              <MapPin className="w-4 h-4 text-amber-400" />
+              <span>Open District Map</span>
+            </button>
+          </div>
         </div>
 
         {/* 8 Overview Cards */}
@@ -395,7 +381,7 @@ export default function RoleDashboardView({
                         className="px-3 py-1 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 mx-auto shadow-2xs"
                       >
                         <Eye className="w-3.5 h-3.5 text-amber-400" />
-                        <span>View Details</span>
+                        <span>Inspect</span>
                       </button>
                     </td>
                   </tr>
@@ -430,8 +416,8 @@ export default function RoleDashboardView({
               onClick={() => onNavigate('map')}
               className="px-4 py-2 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2"
             >
-              <span>State Geo-Map</span>
-              <ArrowUpRight className="w-4 h-4 text-amber-400" />
+              <MapPin className="w-4 h-4 text-amber-400" />
+              <span>Open State GIS Map</span>
             </button>
           </div>
         </div>
@@ -453,7 +439,7 @@ export default function RoleDashboardView({
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900">District Performance & Risk Comparison Leaderboard</h3>
-              <p className="text-xs text-slate-500">Click any district to drill down into its dedicated monitoring dashboard</p>
+              <p className="text-xs text-slate-500">Click any district to view its live GIS Map & Project Locations</p>
             </div>
             <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-lg">
               {districtsList.length} Districts
@@ -471,7 +457,7 @@ export default function RoleDashboardView({
                   <th className="px-4 py-3 text-right">Delayed</th>
                   <th className="px-4 py-3 text-right">High Risk</th>
                   <th className="px-4 py-3 text-right">Avg Risk Score</th>
-                  <th className="px-6 py-3 text-center">Drill Down</th>
+                  <th className="px-6 py-3 text-center">Open Map</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
@@ -480,6 +466,7 @@ export default function RoleDashboardView({
                     key={idx} 
                     onClick={() => {
                       setSelectedScope({ ...selectedScope, district: d.district });
+                      onNavigate('map');
                     }}
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer"
                   >
@@ -506,8 +493,8 @@ export default function RoleDashboardView({
                     </td>
                     <td className="px-6 py-3.5 text-center">
                       <span className="text-blue-600 font-bold hover:underline flex items-center justify-center gap-1">
-                        <span>Open District</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <MapPin className="w-3.5 h-3.5 text-red-500" />
+                        <span>Open District Map</span>
                       </span>
                     </td>
                   </tr>
@@ -539,24 +526,24 @@ export default function RoleDashboardView({
           
           <p className="mt-2 text-sm text-blue-100/90 leading-relaxed">
             Macro oversight of <strong className="text-white">43,496 official projects</strong> across <strong className="text-white">33 States/UTs</strong>. 
-            Drill-down pipeline: <span className="text-amber-300 font-bold">Ministry ➔ State ➔ District ➔ Project</span>.
+            Click any State or District to inspect on the <span className="text-amber-300 font-bold">Interactive GIS Map</span>.
           </p>
 
           <div className="mt-5 flex flex-wrap gap-3">
             <button
-              onClick={() => onNavigate('alerts')}
+              onClick={() => onNavigate('map')}
               className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-bold rounded-lg transition-all shadow-md flex items-center gap-2"
             >
-              <AlertTriangle className="w-4 h-4" />
-              <span>National Priority Alerts ({summary?.high_risk_projects || 0})</span>
+              <MapPin className="w-4 h-4" />
+              <span>Open National GIS Map</span>
             </button>
 
             <button
-              onClick={() => onNavigate('map')}
+              onClick={() => onNavigate('alerts')}
               className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-lg transition-all border border-white/20 flex items-center gap-2"
             >
-              <span>National Geo-Map</span>
-              <ArrowUpRight className="w-4 h-4" />
+              <AlertTriangle className="w-4 h-4" />
+              <span>National Priority Alerts ({summary?.high_risk_projects || 0})</span>
             </button>
           </div>
         </div>
@@ -579,7 +566,7 @@ export default function RoleDashboardView({
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-extrabold text-slate-900">National State Ranking Leaderboard (33 States/UTs)</h3>
-            <p className="text-xs text-slate-500">Click any state to drill down into its State Nodal & District Dashboards</p>
+            <p className="text-xs text-slate-500">Click any state to open its interactive GIS Map and local works</p>
           </div>
           <span className="text-xs text-slate-500">Sorted by Total Works Volume</span>
         </div>
@@ -596,7 +583,7 @@ export default function RoleDashboardView({
                 <th className="px-4 py-3 text-right">Delayed</th>
                 <th className="px-4 py-3 text-right">High Risk</th>
                 <th className="px-4 py-3 text-center">Risk Level</th>
-                <th className="px-6 py-3 text-center">Drill Down</th>
+                <th className="px-6 py-3 text-center">Open Map</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
@@ -605,7 +592,7 @@ export default function RoleDashboardView({
                   key={idx} 
                   onClick={() => {
                     setSelectedScope({ ...selectedScope, state: st.state, district: 'All' });
-                    onNavigate('dashboard');
+                    onNavigate('map');
                   }}
                   className="hover:bg-blue-50/40 transition-colors cursor-pointer"
                 >
@@ -627,8 +614,8 @@ export default function RoleDashboardView({
                   </td>
                   <td className="px-6 py-3.5 text-center">
                     <span className="text-blue-600 font-bold hover:underline flex items-center justify-center gap-1">
-                      <span>View State</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <MapPin className="w-3.5 h-3.5 text-red-500" />
+                      <span>Open Map</span>
                     </span>
                   </td>
                 </tr>

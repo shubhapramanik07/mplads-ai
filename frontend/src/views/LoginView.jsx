@@ -120,10 +120,10 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
         },
         user: {
           id: cleanUser,
-          name: selectedRole === 'ministry' ? 'Joint Secretary (MoSPI)' :
-                selectedRole === 'state' ? `Nodal Officer (${selectedState})` :
-                selectedRole === 'district' ? `District Magistrate (${selectedDistrict})` :
-                `Hon. MP (${activeMpObj.mp_name} — ${activeMpObj.constituency})`,
+          name: selectedRole === 'ministry' ? 'Central Ministry Official' :
+                selectedRole === 'state' ? `State Nodal Officer (${selectedState})` :
+                selectedRole === 'district' ? `District Authority (${selectedDistrict})` :
+                'Member of Parliament',
           roleTitle: roles.find(r => r.id === selectedRole)?.title
         }
       });
@@ -166,7 +166,7 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
                 </div>
                 <div className="flex items-center gap-2 text-blue-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Dedicated Constituency & District Portals</span>
+                  <span>Interactive Street & Satellite GIS Map</span>
                 </div>
                 <div className="flex items-center gap-2 text-blue-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -333,7 +333,7 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
                     <input
                       type={showPassword ? "text" : "password"}
                       required
-                      placeholder="Enter Password (e.g. sih)"
+                      placeholder="Enter Password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full px-3.5 py-2 text-xs font-medium border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden pr-10"
@@ -374,7 +374,7 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
 
       {/* Official Footer */}
       <footer className="text-center text-[11px] text-slate-500 pb-4">
-        © 2026 Ministry of Statistics and Programme Implementation (MoSPI), Government of India • SIH Problem Statement SIH26102
+        © 2026 Ministry of Statistics and Programme Implementation (MoSPI), Government of India
       </footer>
     </div>
   );

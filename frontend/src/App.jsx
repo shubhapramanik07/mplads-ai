@@ -113,6 +113,9 @@ export default function App() {
         setCurrentRole={(newRole) => {
           setCurrentRole(newRole);
           sessionStorage.setItem('mplads_role', newRole);
+          if (newRole !== 'ministry' && activeNav === 'analytics') {
+            setActiveNav('dashboard');
+          }
         }}
         selectedScope={selectedScope}
         setSelectedScope={(newScope) => {
@@ -161,7 +164,7 @@ export default function App() {
           />
         )}
 
-        {activeNav === 'analytics' && (
+        {activeNav === 'analytics' && currentRole === 'ministry' && (
           <AnalyticsView 
             currentRole={currentRole}
             selectedScope={selectedScope}
@@ -202,7 +205,7 @@ export default function App() {
                 MPLADS AI Monitoring & Decision Support Platform
               </div>
               <div className="text-slate-400">
-                Smart India Hackathon (SIH) Problem Statement SIH26102
+                Ministry of Statistics and Programme Implementation (MoSPI) • Government of India
               </div>
             </div>
           </div>

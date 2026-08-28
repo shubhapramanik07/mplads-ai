@@ -289,7 +289,7 @@ export default function WorkDetailModal({ work, onClose }) {
         {/* Footer */}
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
           <span className="text-[11px] text-slate-500 font-medium">
-            Explainable AI Multi-Factor Scoring Architecture (MoSPI SIH26102)
+            Explainable AI Multi-Factor Scoring Architecture • MoSPI e-SAKSHI
           </span>
           <button
             onClick={onClose}

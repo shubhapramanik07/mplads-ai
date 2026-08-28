@@ -17,7 +17,7 @@ from backend.data_loader import compute_peer_group_stats
 
 app = FastAPI(
     title="MPLADS AI Monitoring & Risk Analytics Platform API",
-    description="Role-Based Intelligence & Decision Support System for SIH Problem Statement SIH26102",
+    description="Role-Based Intelligence & Decision Support System • Government of India MoSPI",
     version="2.0.0"
 )
 
@@ -570,7 +570,7 @@ def root():
     return {
         "status": "online",
         "system": "MPLADS AI Monitoring & Decision Support Platform",
-        "problem_statement": "SIH26102",
+        "ministry": "Ministry of Statistics and Programme Implementation (MoSPI)",
         "docs_url": "/docs"
     }
 
