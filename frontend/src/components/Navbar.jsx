@@ -15,7 +15,8 @@ import {
   Building,
   Layers,
   UserCheck,
-  Check
+  Check,
+  LogOut
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -29,6 +30,8 @@ export default function Navbar({
   activeNav, 
   setActiveNav,
   alertCount = 0,
+  authUser = null,
+  onLogout = null,
   onGlobalSearch
 }) {
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
@@ -96,7 +99,7 @@ export default function Navbar({
         </div>
 
         {/* Right: Role Switcher & User Profile */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           
           {/* Notifications Button */}
           <button 
@@ -112,7 +115,7 @@ export default function Navbar({
             )}
           </button>
 
-          {/* Role Switcher Menu */}
+          {/* User Profile & Role Switcher */}
           <div className="relative">
             <button
               onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
@@ -122,7 +125,9 @@ export default function Navbar({
                 <User className="w-4 h-4 text-amber-400" />
               </div>
               <div className="hidden sm:block">
-                <div className="text-[10px] font-bold text-slate-400 uppercase leading-none">Active Role</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase leading-none">
+                  {authUser?.name || 'Authenticated Officer'}
+                </div>
                 <div className="text-xs font-black text-slate-900 flex items-center gap-1">
                   <span>{roles.find(r => r.id === currentRole)?.label}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
@@ -170,6 +175,17 @@ export default function Navbar({
               </div>
             )}
           </div>
+
+          {/* Logout Button */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="p-2 text-slate-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-slate-200 hover:border-red-200"
+              title="Log Out of Session"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
 
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import WorkDetailModal from './components/WorkDetailModal';
+import LoginView from './views/LoginView';
 import RoleDashboardView from './views/RoleDashboardView';
 import WorkExplorerView from './views/WorkExplorerView';
 import AlertsView from './views/AlertsView';
@@ -12,14 +13,25 @@ import { fetchStates, fetchDistricts, fetchMPSummaries, fetchApiAlerts } from '.
 import { ExternalLink } from 'lucide-react';
 
 export default function App() {
-  const [currentRole, setCurrentRole] = useState('ministry'); // ministry, state, district, mp
-  const [selectedScope, setSelectedScope] = useState({
-    state: 'Uttar Pradesh',
-    district: 'All',
-    mpName: ''
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('mplads_auth') === 'true';
   });
 
-  const [activeNav, setActiveNav] = useState('dashboard'); // dashboard, projects, alerts, analytics, map, reports, validation
+  const [authUser, setAuthUser] = useState(() => {
+    const saved = sessionStorage.getItem('mplads_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [currentRole, setCurrentRole] = useState(() => {
+    return sessionStorage.getItem('mplads_role') || 'ministry';
+  });
+
+  const [selectedScope, setSelectedScope] = useState(() => {
+    const saved = sessionStorage.getItem('mplads_scope');
+    return saved ? JSON.parse(saved) : { state: 'Uttar Pradesh', district: 'All', mpName: '' };
+  });
+
+  const [activeNav, setActiveNav] = useState('dashboard');
   const [inspectedProject, setInspectedProject] = useState(null);
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -35,21 +47,46 @@ export default function App() {
       ]);
       setStates(stList || []);
       setMps(mpList || []);
-      if (mpList && mpList.length > 0) {
+      setAlertCount(alertsRes?.total_alerts || 0);
+
+      if (mpList && mpList.length > 0 && !selectedScope.mpName) {
         setSelectedScope(prev => ({ ...prev, mpName: mpList[0].mp_name }));
       }
-      setAlertCount(alertsRes?.total_alerts || 0);
     }
     loadInitialMetadata();
   }, []);
 
   useEffect(() => {
     async function loadDistricts() {
-      const distList = await fetchDistricts(selectedScope.state);
-      setDistricts(distList || []);
+      if (selectedScope.state && selectedScope.state !== 'National') {
+        const distList = await fetchDistricts(selectedScope.state);
+        setDistricts(distList || []);
+      }
     }
     loadDistricts();
   }, [selectedScope.state]);
+
+  const handleLogin = (authData) => {
+    setIsAuthenticated(true);
+    setAuthUser(authData.user);
+    setCurrentRole(authData.role);
+    setSelectedScope(authData.scope);
+    setActiveNav('dashboard');
+
+    sessionStorage.setItem('mplads_auth', 'true');
+    sessionStorage.setItem('mplads_user', JSON.stringify(authData.user));
+    sessionStorage.setItem('mplads_role', authData.role);
+    sessionStorage.setItem('mplads_scope', JSON.stringify(authData.scope));
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setAuthUser(null);
+    sessionStorage.removeItem('mplads_auth');
+    sessionStorage.removeItem('mplads_user');
+    sessionStorage.removeItem('mplads_role');
+    sessionStorage.removeItem('mplads_scope');
+  };
 
   const handleGlobalSearch = (query) => {
     if (query) {
@@ -57,21 +94,40 @@ export default function App() {
     }
   };
 
+  // If not authenticated, render Login Page
+  if (!isAuthenticated) {
+    return (
+      <LoginView
+        onLogin={handleLogin}
+        states={states}
+        mps={mps}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       
-      {/* Role-Aware Navigation Bar */}
+      {/* Role-Aware Navigation Bar with User Badge & Logout */}
       <Navbar 
         currentRole={currentRole}
-        setCurrentRole={setCurrentRole}
+        setCurrentRole={(newRole) => {
+          setCurrentRole(newRole);
+          sessionStorage.setItem('mplads_role', newRole);
+        }}
         selectedScope={selectedScope}
-        setSelectedScope={setSelectedScope}
+        setSelectedScope={(newScope) => {
+          setSelectedScope(newScope);
+          sessionStorage.setItem('mplads_scope', JSON.stringify(newScope));
+        }}
         states={states}
         districts={districts}
         mps={mps}
         activeNav={activeNav}
         setActiveNav={setActiveNav}
         alertCount={alertCount}
+        authUser={authUser}
+        onLogout={handleLogout}
         onGlobalSearch={handleGlobalSearch}
       />
 
@@ -81,7 +137,10 @@ export default function App() {
           <RoleDashboardView
             currentRole={currentRole}
             selectedScope={selectedScope}
-            setSelectedScope={setSelectedScope}
+            setSelectedScope={(newScope) => {
+              setSelectedScope(newScope);
+              sessionStorage.setItem('mplads_scope', JSON.stringify(newScope));
+            }}
             onSelectProject={(p) => setInspectedProject(p)}
             onNavigate={(nav) => setActiveNav(nav)}
           />
