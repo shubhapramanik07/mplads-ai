@@ -1,6 +1,9 @@
 """
 Accurate & Calibrated ML + Rule-Based Risk Engine for MPLADS Anomaly, Fraud and Inefficiency Detection.
-Computes 0-100 explainable risk scores combining Isolation Forest, Rule Engine, TF-IDF NLP, Compliance, and IDA Concentration.
+Enforces:
+1. Completed projects (100% progress) are STRICTLY NOT picked as High/Critical Risk unless there is an identical copy/duplicate sanction (similarity >= 85%).
+2. Low physical progress despite high financial expenditure is explicitly flagged as high risk.
+3. Plain-English explainable factors for forensic audit.
 """
 import os
 import json
@@ -18,7 +21,7 @@ DEFAULT_OUTPUT_PATH = os.path.join(
 )
 
 class MPLADSRiskEngine:
-    def __init__(self, sim_threshold: float = 0.70, contamination: float = 0.08):
+    def __init__(self, sim_threshold: float = 0.82, contamination: float = 0.05):
         self.sim_threshold = sim_threshold
         self.contamination = contamination
         self.iso_forest = IsolationForest(
@@ -69,38 +72,34 @@ class MPLADSRiskEngine:
             wtype = str(wtypes[idx])
             state = str(states[idx])
             
-            if_contrib = float(norm_anomaly[idx]) * 35.0
+            if_contrib = float(norm_anomaly[idx]) * 30.0
 
             wt_contrib = 0.0
-            if wt_dev > 150.0:
-                wt_contrib = 45.0
-                reasons.append(f"Severe price inflation: Cost is {wt_dev:+.1f}% above national peer median for '{wtype}' works")
-            elif wt_dev > 75.0:
-                wt_contrib = 30.0 + (wt_dev - 75.0) * 0.20
-                reasons.append(f"Elevated expenditure: Cost is {wt_dev:+.1f}% above peer median for '{wtype}' works")
-            elif wt_dev > 35.0:
-                wt_contrib = (wt_dev - 35.0) * 0.35
+            if wt_dev > 200.0:
+                wt_contrib = 50.0
+                reasons.append(f"Elevated price variance: Cost is {wt_dev:+.1f}% above peer median for '{wtype}' works")
+            elif wt_dev > 100.0:
+                wt_contrib = 25.0 + (wt_dev - 100.0) * 0.15
+                reasons.append(f"Above-average expenditure: Cost is {wt_dev:+.1f}% above peer median for '{wtype}' works")
+            elif wt_dev > 50.0:
+                wt_contrib = (wt_dev - 50.0) * 0.15
                 reasons.append(f"Moderate cost variance: +{wt_dev:.1f}% above peer median for '{wtype}'")
 
             st_contrib = 0.0
-            if st_dev > 100.0:
-                st_contrib = min(20.0, (st_dev - 100.0) * 0.15 + 10.0)
-                reasons.append(f"Cost is {st_dev:+.1f}% above overall state median expenditure in {state}")
+            if st_dev > 150.0:
+                st_contrib = min(20.0, (st_dev - 150.0) * 0.10 + 5.0)
+                reasons.append(f"Cost is {st_dev:+.1f}% above overall state median in {state}")
 
             # Cost overrun rule
             if amt > sanc and sanc > 0:
                 overrun_pct = round(((amt - sanc) / sanc) * 100, 1)
                 wt_contrib = min(50.0, wt_contrib + 15.0)
-                reasons.append(f"Cost overrun detected: Expenditure exceeds sanctioned amount by ₹{(amt - sanc):,.0f} (+{overrun_pct}%)")
-
-            if amt >= 4500000.0:
-                wt_contrib = min(45.0, wt_contrib + 10.0)
-                reasons.append(f"Near-maximum ceiling allocation of ₹{amt:,.0f}")
+                reasons.append(f"Cost overrun: Expenditure exceeds sanctioned budget by ₹{(amt - sanc):,.0f} (+{overrun_pct}%)")
 
             c_score = min(100.0, if_contrib + wt_contrib + st_contrib)
             cost_risk_scores.append(round(c_score, 1))
 
-            is_extreme = wt_dev > 100.0 or c_score >= 55.0
+            is_extreme = wt_dev > 200.0 or c_score >= 70.0
             is_cost_outlier.append(bool(is_extreme))
             cost_reasons.append(reasons)
 
@@ -139,12 +138,12 @@ class MPLADSRiskEngine:
                 is_dup_list[idx_i] = True
                 is_dup_list[idx_j] = True
 
-                if sim >= 0.90:
-                    score_val = 90.0 + (sim - 0.90) * 100.0
-                elif sim >= 0.80:
-                    score_val = 75.0 + (sim - 0.80) * 150.0
+                if sim >= 0.95:
+                    score_val = 95.0 + (sim - 0.95) * 100.0
+                elif sim >= 0.88:
+                    score_val = 85.0 + (sim - 0.88) * 140.0
                 else:
-                    score_val = 50.0 + (sim - 0.70) * 250.0
+                    score_val = 60.0 + (sim - 0.82) * 200.0
 
                 score_val = min(100.0, max(0.0, score_val))
                 dup_scores[idx_i] = max(dup_scores[idx_i], score_val)
@@ -164,11 +163,11 @@ class MPLADSRiskEngine:
                 total_dups = len(matches)
                 first_match_id, first_pct = matches[0]
                 if total_dups == 1:
-                    reasons.append(f"{first_pct}% textual duplication match to work #{first_match_id} by same MP")
+                    reasons.append(f"{first_pct}% identical duplicate sanction match to work #{first_match_id} by same MP")
                     matched_ids[idx] = first_match_id
                 else:
                     sample_ids = ", ".join([m[0] for m in matches[:3]])
-                    reasons.append(f"{first_pct}% textual similarity to {total_dups} duplicate works by same MP (#{sample_ids}...)")
+                    reasons.append(f"{first_pct}% duplicate sanction similarity across {total_dups} works by same MP (#{sample_ids}...)")
                     matched_ids[idx] = ", ".join([m[0] for m in matches[:5]])
             dup_reasons.append(reasons)
 
@@ -220,22 +219,17 @@ class MPLADSRiskEngine:
 
             max_share = max(w_share, a_share)
 
-            if max_share >= 50.0:
+            if max_share >= 60.0:
                 flag = True
-                score = min(100.0, 75.0 + (max_share - 50.0) * 0.80)
+                score = min(100.0, 60.0 + (max_share - 60.0) * 0.70)
                 reasons.append(
-                    f"Acute agency monopoly: IDA controls {w_share:.1f}% of works ({a_share:.1f}% of funds) in {state_name}"
+                    f"Single-agency monopoly: IDA controls {w_share:.1f}% of works ({a_share:.1f}% of funds) in {state_name}"
                 )
-            elif max_share >= 35.0:
+            elif max_share >= 45.0:
                 flag = True
-                score = 50.0 + (max_share - 35.0) * 1.5
+                score = 35.0 + (max_share - 45.0) * 1.0
                 reasons.append(
-                    f"Monopoly concentration risk: IDA controls {w_share:.1f}% of works ({a_share:.1f}% of funds) in {state_name}"
-                )
-            elif max_share >= 25.0:
-                score = 25.0 + (max_share - 25.0) * 1.5
-                reasons.append(
-                    f"Elevated single-agency concentration: {w_share:.1f}% of state works"
+                    f"Elevated agency concentration: IDA controls {w_share:.1f}% of works in {state_name}"
                 )
 
             is_high_conc.append(flag)
@@ -250,44 +244,58 @@ class MPLADSRiskEngine:
         )
 
     def compute_compliance_risk(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, List[List[str]]]:
-        """Calculates documentation & photo proof compliance risk score (0-100)."""
+        """Calculates documentation, progress-expenditure gap, and schedule risk score (0-100)."""
         is_non_compliant = ~df["has_images"].astype(bool)
         comp_scores = []
         comp_reasons = []
 
         has_imgs = df["has_images"].to_numpy()
         amts = df["final_amount"].to_numpy()
+        sanc_amts = df["sanctioned_amount"].to_numpy() if "sanctioned_amount" in df.columns else amts
+        progress_pcts = df["progress_pct"].to_numpy() if "progress_pct" in df.columns else [100.0] * len(df)
         is_delays = df["is_delayed"].to_numpy() if "is_delayed" in df.columns else [False] * len(df)
 
         for idx in range(len(df)):
             reasons = []
             score = 0.0
             amt = float(amts[idx])
+            sanc = float(sanc_amts[idx])
+            prog = float(progress_pcts[idx])
             delayed = bool(is_delays[idx])
+            util = (amt / max(1.0, sanc)) * 100.0
 
+            # Missing photos gap
             if not bool(has_imgs[idx]):
-                if amt >= 2500000:
-                    score = 80.0
+                if amt >= 3000000:
+                    score += 35.0
                     reasons.append(f"High-value project (₹{amt:,.0f}) lacking mandatory geo-tagged inspection photos")
-                elif amt >= 1000000:
-                    score = 60.0
+                elif amt >= 1500000:
+                    score += 20.0
                     reasons.append(f"Mid-value work (₹{amt:,.0f}) missing visual physical completion proof")
                 else:
-                    score = 35.0
+                    score += 10.0
                     reasons.append("Missing mandatory geo-tagged completion photos (documentation gap)")
 
+            # Milestone delay
             if delayed:
-                score = min(100.0, score + 25.0)
+                score += 35.0
                 reasons.append("Project milestone completion significantly delayed beyond expected schedule")
 
-            comp_scores.append(score)
+            # Inefficiency rule: High expenditure with low physical progress!
+            if prog < 60.0 and util >= 80.0:
+                score += 65.0
+                reasons.append(f"Disproportionate financial outlay: {util:.0f}% budget expended with only {prog:.0f}% physical execution achieved")
+
+            comp_scores.append(min(100.0, score))
             comp_reasons.append(reasons)
 
         return is_non_compliant, pd.Series(comp_scores, index=df.index), comp_reasons
 
     def evaluate_all_risks(self, df: Optional[pd.DataFrame] = None, output_path: Optional[str] = DEFAULT_OUTPUT_PATH) -> pd.DataFrame:
         """
-        Calibrated multi-factor risk inference pipeline with dominant driver escalation and compound fraud multipliers.
+        Calibrated multi-factor risk inference pipeline:
+        - If progress == 100% and no severe duplicate copy sanction exists, project is STRICTLY NOT high risk.
+        - High risk is reserved for low progress with high funds, delays, or direct copy sanctions.
         """
         if df is None:
             df_raw = load_clean_data()
@@ -310,44 +318,43 @@ class MPLADSRiskEngine:
         d_arr = dup_scores.to_numpy()
         m_arr = comp_scores.to_numpy()
         i_arr = ida_scores.to_numpy()
+        prog_arr = df_enriched["progress_pct"].to_numpy() if "progress_pct" in df_enriched.columns else [100.0] * len(df_enriched)
+        delayed_arr = df_enriched["is_delayed"].to_numpy() if "is_delayed" in df_enriched.columns else [False] * len(df_enriched)
 
         for idx in range(len(df_enriched)):
             c_score = float(c_arr[idx])
             d_score = float(d_arr[idx])
             m_score = float(m_arr[idx])
             i_score = float(i_arr[idx])
+            prog = float(prog_arr[idx])
+            is_del = bool(delayed_arr[idx])
 
-            # 1. Base Weighted Score (Cost: 35%, Duplicate: 35%, Compliance: 15%, Monopoly: 15%)
+            # 1. Base Weighted Score (Cost: 30%, Duplicate: 40%, Compliance/Progress: 20%, Monopoly: 10%)
             weighted_score = (
-                (c_score * 0.35) +
-                (d_score * 0.35) +
-                (m_score * 0.15) +
-                (i_score * 0.15)
+                (c_score * 0.30) +
+                (d_score * 0.40) +
+                (m_score * 0.20) +
+                (i_score * 0.10)
             )
 
-            # 2. Dominant Driver Escalation
-            max_driver = max(c_score, d_score)
-            if max_driver >= 80.0:
-                weighted_score = max(weighted_score, max_driver * 0.88)
-            elif max_driver >= 65.0:
-                weighted_score = max(weighted_score, max_driver * 0.75)
-
-            # 3. Compound Anomaly Surge
-            active_flags = sum([
-                1 if c_score >= 45.0 else 0,
-                1 if d_score >= 45.0 else 0,
-                1 if m_score >= 45.0 else 0,
-                1 if i_score >= 45.0 else 0
-            ])
-            if active_flags >= 3:
-                weighted_score = min(100.0, weighted_score * 1.30 + 10.0)
-            elif active_flags >= 2:
-                weighted_score = min(100.0, weighted_score * 1.18 + 5.0)
+            # 2. STRICT RULE: IF PROGRESS IS 100% AND NOT DELAYED
+            if prog >= 100.0 and not is_del:
+                if d_score >= 85.0:
+                    # Clear verbatim copy duplicate sanction! Flag as High Risk
+                    weighted_score = max(72.0, d_score * 0.90)
+                else:
+                    # 100% completed normal work: STRICTLY CAP RISK AT LOW (<35.0)
+                    weighted_score = min(32.0, weighted_score * 0.25)
+            else:
+                # For delayed works, low physical progress, or ongoing works with discrepancies
+                max_driver = max(c_score, d_score, m_score)
+                if max_driver >= 70.0:
+                    weighted_score = max(weighted_score, max_driver * 0.85)
 
             final_score = round(min(100.0, max(0.0, weighted_score)), 1)
             final_risk_scores.append(final_score)
 
-            # 4. Strict 4-Tier Risk Classification
+            # 3. 4-Tier Risk Classification
             if final_score >= 85.0:
                 risk_categories.append("CRITICAL")
                 risk_levels.append("CRITICAL")
@@ -361,15 +368,23 @@ class MPLADSRiskEngine:
                 risk_categories.append("LOW")
                 risk_levels.append("LOW")
 
-            # 5. Compile Plain-English Reasons
+            # 4. Compile Plain-English Reasons
             all_reasons = []
-            all_reasons.extend(cost_reasons[idx])
-            all_reasons.extend(dup_reasons[idx])
-            all_reasons.extend(comp_reasons[idx])
-            all_reasons.extend(ida_reasons[idx])
-
+            if final_score >= 70.0:
+                all_reasons.extend(dup_reasons[idx])
+                all_reasons.extend(comp_reasons[idx])
+                all_reasons.extend(cost_reasons[idx])
+                all_reasons.extend(ida_reasons[idx])
+            elif final_score >= 40.0:
+                all_reasons.extend(cost_reasons[idx])
+                all_reasons.extend(comp_reasons[idx])
+                all_reasons.extend(ida_reasons[idx])
+            
             if not all_reasons:
-                all_reasons.append("All project parameters within normal peer-group bounds")
+                if prog >= 100.0:
+                    all_reasons.append("100% physically completed on schedule with parameters conforming to peer baselines")
+                else:
+                    all_reasons.append("Project execution parameters within normal peer bounds")
 
             combined_reasons_json.append(json.dumps(all_reasons))
 
@@ -394,7 +409,7 @@ class MPLADSRiskEngine:
         if output_path:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             df_output.to_csv(output_path, index=False)
-            print(f"Calibrated risk scoring complete. {len(df_output)} works scored and saved to {output_path}")
+            print(f"Risk scoring complete. {len(df_output)} works scored and saved to {output_path}")
 
         return df_output
 

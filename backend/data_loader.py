@@ -56,7 +56,6 @@ STATE_COORDINATES = {
 def _get_geo_coords(state: str, work_id: str) -> Tuple[float, float]:
     """Generates realistic latitude & longitude around the state centroid."""
     base = STATE_COORDINATES.get(state, (20.5937, 78.9629))
-    # Deterministic pseudo-random offset based on work_id hash
     h = int(hashlib.md5(str(work_id).encode()).hexdigest()[:8], 16)
     lat_offset = ((h % 1000) / 1000.0 - 0.5) * 1.8
     lon_offset = (((h // 1000) % 1000) / 1000.0 - 0.5) * 2.2
@@ -92,7 +91,7 @@ def load_clean_data(csv_path: str = DEFAULT_DATA_PATH, force_reload: bool = Fals
     df["project_name"] = df["work_description"].fillna("MPLADS Infrastructure Work").astype(str).str.strip()
     df["implementing_agency"] = df["ida"].fillna("District Rural Development Agency").astype(str).str.strip()
 
-    # Calculate financial parameters
+    # Calculate financial parameters and progress
     expenditures = df["final_amount"].to_numpy()
     work_ids = df["work_id"].astype(str).to_numpy()
     states = df["state"].astype(str).to_numpy()
@@ -122,8 +121,8 @@ def load_clean_data(csv_path: str = DEFAULT_DATA_PATH, force_reload: bool = Fals
         est_cost = round(exp * (0.90 + var_factor * 0.25), -2)
         estimated_costs.append(est_cost)
 
-        # 15% of projects have budget cost overrun (sanctioned < exp)
-        if var_factor < 0.15:
+        # 12% of projects have budget cost overrun (sanctioned < exp)
+        if var_factor < 0.12:
             sanc_amt = round(exp * 0.82, -2) # Cost Overrun!
         else:
             sanc_amt = round(max(exp, est_cost * 1.05), -2)
@@ -139,18 +138,32 @@ def load_clean_data(csv_path: str = DEFAULT_DATA_PATH, force_reload: bool = Fals
         s_date = c_date - timedelta(days=duration_days)
         start_dates.append(s_date.strftime("%Y-%m-%d"))
 
-        # Delayed completion in 20% of projects
-        if var_factor < 0.20:
+        # Status & Progress distribution:
+        # 75% Completed (100% progress)
+        # 15% Ongoing (40% - 85% progress)
+        # 10% Delayed (25% - 75% progress or delayed completion)
+        if var_factor < 0.10:
+            # Delayed
             exp_date = c_date - timedelta(days=int(30 + var_factor * 120))
             is_delayed_list.append(True)
             statuses.append("Delayed")
+            progress_val = round(35.0 + (var_factor / 0.10) * 45.0, 1)
+            progress_pcts.append(progress_val)
+        elif var_factor < 0.25:
+            # Ongoing
+            exp_date = c_date + timedelta(days=int(60 + var_factor * 120))
+            is_delayed_list.append(False)
+            statuses.append("Ongoing")
+            progress_val = round(45.0 + ((var_factor - 0.10) / 0.15) * 40.0, 1)
+            progress_pcts.append(progress_val)
         else:
-            exp_date = c_date + timedelta(days=int(10 + var_factor * 45))
+            # 100% Completed
+            exp_date = c_date + timedelta(days=int(10 + var_factor * 30))
             is_delayed_list.append(False)
             statuses.append("Completed")
+            progress_pcts.append(100.0)
 
         expected_comp_dates.append(exp_date.strftime("%Y-%m-%d"))
-        progress_pcts.append(100.0)
 
         # Coordinates
         lat, lon = _get_geo_coords(st, wid)
