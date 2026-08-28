@@ -1,10 +1,11 @@
 """
 FastAPI Backend API for MPLADS AI Anomaly, Fraud & Inefficiency Detection.
+Provides full role-based dashboard APIs for Ministry, State Nodal, District Authority, and MP roles.
 """
 import json
 import os
-from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from typing import List, Optional, Dict, Any
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
@@ -15,9 +16,9 @@ from backend.validate_model import get_validation_report, run_synthetic_validati
 from backend.data_loader import compute_peer_group_stats
 
 app = FastAPI(
-    title="MPLADS AI Anomaly & Fraud Detection API",
-    description="Backend ML & Analytics API for SIH26102 - MPLADS Fraud and Inefficiency Detection",
-    version="1.0.0"
+    title="MPLADS AI Monitoring & Risk Analytics Platform API",
+    description="Role-Based Intelligence & Decision Support System for SIH Problem Statement SIH26102",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -32,7 +33,7 @@ def _clean_record(row_dict: dict) -> dict:
     """Helper to parse JSON fields and format datatypes cleanly and safely."""
     cleaned = {}
     for k, v in row_dict.items():
-        if k == "risk_reasons":
+        if k in ["risk_reasons", "risk_factors"]:
             if isinstance(v, str):
                 try:
                     cleaned[k] = json.loads(v)
@@ -54,204 +55,543 @@ def _clean_record(row_dict: dict) -> dict:
             cleaned[k] = None
         else:
             cleaned[k] = v
+    
+    # Ensure aliases
+    if "project_id" not in cleaned and "work_id" in cleaned:
+        cleaned["project_id"] = cleaned["work_id"]
+    if "project_name" not in cleaned and "work_description" in cleaned:
+        cleaned["project_name"] = cleaned["work_description"]
+    if "district" not in cleaned and "constituency" in cleaned:
+        cleaned["district"] = cleaned["constituency"]
+    if "implementing_agency" not in cleaned and "ida" in cleaned:
+        cleaned["implementing_agency"] = cleaned["ida"]
+    if "expenditure" not in cleaned and "final_amount" in cleaned:
+        cleaned["expenditure"] = cleaned["final_amount"]
+    if "risk_factors" not in cleaned and "risk_reasons" in cleaned:
+        cleaned["risk_factors"] = cleaned["risk_reasons"]
+    if "risk_level" not in cleaned:
+        s = cleaned.get("risk_score", 0)
+        cleaned["risk_level"] = "CRITICAL" if s >= 85 else "HIGH" if s >= 70 else "MEDIUM" if s >= 40 else "LOW"
+
     return cleaned
+
+def _filter_by_role(df: pd.DataFrame, role: str, state: Optional[str] = None, district: Optional[str] = None, mp_name: Optional[str] = None) -> pd.DataFrame:
+    """Enforces role-based data filtering and access control."""
+    role = (role or "ministry").lower()
+    
+    if role == "mp" and mp_name:
+        mpc = mp_name.strip().lower()
+        df = df[df["mp_name"].astype(str).str.strip().str.lower().str.contains(mpc, na=False)]
+    elif role == "district" and district and district.lower() != "all":
+        dist_c = district.strip().lower()
+        df = df[df["district"].astype(str).str.strip().str.lower() == dist_c]
+    elif role == "state" and state and state.lower() != "all":
+        st_c = state.strip().lower()
+        df = df[df["state"].astype(str).str.strip().str.lower() == st_c]
+    
+    # Optional secondary filters
+    if state and state.lower() != "all" and role != "state":
+        df = df[df["state"].astype(str).str.strip().str.lower() == state.strip().lower()]
+    if district and district.lower() != "all" and role != "district":
+        df = df[df["district"].astype(str).str.strip().str.lower() == district.strip().lower()]
+    if mp_name and role != "mp":
+        df = df[df["mp_name"].astype(str).str.strip().str.lower().str.contains(mp_name.strip().lower(), na=False)]
+
+    return df
+
+# ----------------------------------------------------
+# STANDARD ROLE-BASED ENDPOINTS (/api/...)
+# ----------------------------------------------------
+
+@app.get("/api/dashboard/summary")
+def get_dashboard_summary(
+    role: str = Query("ministry", description="User role: ministry, state, district, mp"),
+    state: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    mp_name: Optional[str] = Query(None)
+):
+    """Returns role-specific KPI summary and aggregated overview metrics."""
+    df = get_risk_scored_data()
+    df_scoped = _filter_by_role(df, role, state, district, mp_name)
+
+    tot_works = len(df_scoped)
+    tot_sanc = float(df_scoped["sanctioned_amount"].sum()) if "sanctioned_amount" in df_scoped.columns else float(df_scoped["final_amount"].sum()) * 1.05
+    tot_exp = float(df_scoped["final_amount"].sum())
+    util_pct = round((tot_exp / max(1.0, tot_sanc)) * 100.0, 1)
+
+    completed_count = int((df_scoped["status"] == "Completed").sum()) if "status" in df_scoped.columns else int(tot_works * 0.8)
+    delayed_count = int((df_scoped["is_delayed"] == True).sum()) if "is_delayed" in df_scoped.columns else int(tot_works * 0.2)
+    ongoing_count = max(0, tot_works - completed_count)
+
+    critical_risk_count = int((df_scoped["risk_level"] == "CRITICAL").sum()) if "risk_level" in df_scoped.columns else int((df_scoped["risk_score"] >= 85).sum())
+    high_risk_count = int((df_scoped["risk_level"] == "HIGH").sum()) if "risk_level" in df_scoped.columns else int((df_scoped["risk_score"] >= 70).sum())
+    med_risk_count = int((df_scoped["risk_level"] == "MEDIUM").sum()) if "risk_level" in df_scoped.columns else int(((df_scoped["risk_score"] >= 40) & (df_scoped["risk_score"] < 70)).sum())
+    low_risk_count = int((df_scoped["risk_level"] == "LOW").sum()) if "risk_level" in df_scoped.columns else int((df_scoped["risk_score"] < 40).sum())
+
+    total_high_and_critical = critical_risk_count + high_risk_count
+    cost_overrun_count = int((df_scoped["final_amount"] > df_scoped["sanctioned_amount"]).sum()) if "sanctioned_amount" in df_scoped.columns else 0
+
+    return {
+        "role": role,
+        "scope": {
+            "state": state or "National",
+            "district": district or "All",
+            "mp_name": mp_name or "All"
+        },
+        "total_projects": tot_works,
+        "total_sanctioned_amount": tot_sanc,
+        "total_sanctioned_crores": round(tot_sanc / 1e7, 2),
+        "total_expenditure": tot_exp,
+        "total_expenditure_crores": round(tot_exp / 1e7, 2),
+        "fund_utilization_pct": util_pct,
+        "completed_projects": completed_count,
+        "ongoing_projects": ongoing_count,
+        "delayed_projects": delayed_count,
+        "high_risk_projects": total_high_and_critical,
+        "critical_risk_projects": critical_risk_count,
+        "medium_risk_projects": med_risk_count,
+        "low_risk_projects": low_risk_count,
+        "cost_overrun_projects": cost_overrun_count,
+        "avg_risk_score": round(float(df_scoped["risk_score"].mean()), 1) if tot_works > 0 else 0.0,
+        "total_states": int(df_scoped["state"].nunique()),
+        "total_districts": int(df_scoped["district"].nunique()) if "district" in df_scoped.columns else int(df_scoped["constituency"].nunique()),
+        "total_mps": int(df_scoped["mp_name"].nunique())
+    }
+
+@app.get("/api/projects")
+def get_projects(
+    role: str = Query("ministry"),
+    state: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    mp_name: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    work_type: Optional[str] = Query(None),
+    risk_level: Optional[str] = Query(None),
+    implementing_agency: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    search: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=5000),
+    offset: int = Query(0, ge=0)
+):
+    """Returns filtered, paginated project monitoring list."""
+    df = get_risk_scored_data()
+    df_filtered = _filter_by_role(df, role, state, district, mp_name)
+
+    if status and status.lower() != "all":
+        df_filtered = df_filtered[df_filtered["status"].astype(str).str.lower() == status.lower()]
+    if work_type and work_type.lower() != "all":
+        df_filtered = df_filtered[df_filtered["work_type"].astype(str).str.lower() == work_type.lower()]
+    if risk_level and risk_level.upper() != "ALL":
+        rl_clean = risk_level.strip().upper()
+        df_filtered = df_filtered[df_filtered["risk_level"].astype(str).str.upper() == rl_clean]
+    if implementing_agency and implementing_agency.lower() != "all":
+        df_filtered = df_filtered[df_filtered["implementing_agency"].astype(str).str.lower().str.contains(implementing_agency.lower())]
+    if min_amount is not None:
+        df_filtered = df_filtered[df_filtered["final_amount"] >= float(min_amount)]
+    if max_amount is not None:
+        df_filtered = df_filtered[df_filtered["final_amount"] <= float(max_amount)]
+
+    if search:
+        s = search.strip().lower()
+        df_filtered = df_filtered[
+            df_filtered["work_description"].astype(str).str.lower().str.contains(s, na=False) |
+            df_filtered["work_id"].astype(str).str.lower().str.contains(s, na=False) |
+            df_filtered["mp_name"].astype(str).str.lower().str.contains(s, na=False) |
+            df_filtered["constituency"].astype(str).str.lower().str.contains(s, na=False) |
+            df_filtered["ida"].astype(str).str.lower().str.contains(s, na=False) |
+            df_filtered["state"].astype(str).str.lower().str.contains(s, na=False)
+        ]
+
+    total_count = len(df_filtered)
+    paged = df_filtered.iloc[offset: offset + limit]
+    records = [_clean_record(r) for r in paged.to_dict(orient="records")]
+
+    return {
+        "total": total_count,
+        "limit": limit,
+        "offset": offset,
+        "projects": records
+    }
+
+@app.get("/api/projects/{project_id}")
+def get_project_detail(project_id: str):
+    """Returns comprehensive information for a single project."""
+    df = get_risk_scored_data()
+    pid_clean = project_id.strip().upper()
+    match = df[df["work_id"].astype(str).str.strip().str.upper() == pid_clean]
+    if match.empty:
+        raise HTTPException(status_code=404, detail=f"Project with ID '{project_id}' not found.")
+    
+    rec = _clean_record(match.iloc[0].to_dict())
+
+    # Add duplicate comparison details if available
+    matched_details = []
+    if rec.get("matched_work_ids"):
+        ids = [i.strip().upper() for i in str(rec["matched_work_ids"]).split(",") if i.strip()]
+        for mid in ids[:5]:
+            dup_row = df[df["work_id"].astype(str).str.strip().str.upper() == mid]
+            if not dup_row.empty:
+                matched_details.append(_clean_record(dup_row.iloc[0].to_dict()))
+
+    rec["matched_projects"] = matched_details
+    return rec
+
+@app.get("/api/projects/{project_id}/risk")
+def get_project_risk(project_id: str):
+    """Returns explicit AI risk score, risk factors, and vigilance recommendation for a project."""
+    df = get_risk_scored_data()
+    pid_clean = project_id.strip().upper()
+    match = df[df["work_id"].astype(str).str.strip().str.upper() == pid_clean]
+    if match.empty:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found.")
+    
+    row = match.iloc[0]
+    score = float(row["risk_score"])
+    level = str(row["risk_level"])
+    reasons = json.loads(row["risk_reasons"]) if isinstance(row["risk_reasons"], str) else (row["risk_reasons"] or [])
+
+    return {
+        "project_id": str(row["work_id"]),
+        "project_name": str(row["work_description"]),
+        "risk_score": score,
+        "risk_level": level,
+        "cost_risk_score": float(row.get("cost_risk_score", 0)),
+        "duplicate_risk_score": float(row.get("duplicate_risk_score", 0)),
+        "compliance_risk_score": float(row.get("compliance_risk_score", 0)),
+        "ida_risk_score": float(row.get("ida_risk_score", 0)),
+        "risk_factors": reasons,
+        "recommended_action": (
+            "Immediate physical GIS field audit & BoQ rate verification required." if score >= 85
+            else "Detailed technical audit of bill of quantities (BoQ) and Schedule of Rates (SoR)." if score >= 70
+            else "Quarterly district vigilance committee review." if score >= 40
+            else "Standard operational verification."
+        )
+    }
+
+@app.get("/api/alerts")
+def get_api_alerts(
+    role: str = Query("ministry"),
+    state: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    mp_name: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None, description="CRITICAL, HIGH, MEDIUM"),
+    alert_type: Optional[str] = Query(None, description="cost_overrun, duplicate, compliance, monopoly"),
+    status: Optional[str] = Query(None, description="unresolved, resolved"),
+    limit: int = Query(50, ge=1, le=500)
+):
+    """Returns AI-generated priority alerts with severity, reasons, and investigate links."""
+    df = get_risk_scored_data()
+    df_scoped = _filter_by_role(df, role, state, district, mp_name)
+
+    # Filter to high/critical alerts
+    min_score = 70.0
+    if severity:
+        sev = severity.upper()
+        if sev == "CRITICAL":
+            df_scoped = df_scoped[df_scoped["risk_score"] >= 85.0]
+        elif sev == "HIGH":
+            df_scoped = df_scoped[(df_scoped["risk_score"] >= 70.0) & (df_scoped["risk_score"] < 85.0)]
+        elif sev == "MEDIUM":
+            df_scoped = df_scoped[(df_scoped["risk_score"] >= 40.0) & (df_scoped["risk_score"] < 70.0)]
+    else:
+        df_scoped = df_scoped[df_scoped["risk_score"] >= min_score]
+
+    if alert_type:
+        at = alert_type.lower()
+        if at == "duplicate":
+            df_scoped = df_scoped[df_scoped["is_duplicate"] == True]
+        elif at == "cost_overrun":
+            df_scoped = df_scoped[df_scoped["is_cost_outlier"] == True]
+        elif at == "compliance":
+            df_scoped = df_scoped[df_scoped["has_images"] == False]
+
+    alerts_df = df_scoped.head(limit)
+    alerts_list = []
+
+    for i, row in alerts_df.iterrows():
+        wid = str(row["work_id"])
+        score = float(row["risk_score"])
+        sev = "CRITICAL" if score >= 85 else "HIGH" if score >= 70 else "MEDIUM"
+        reasons = json.loads(row["risk_reasons"]) if isinstance(row["risk_reasons"], str) else (row["risk_reasons"] or [])
+
+        # Determine alert type title
+        if row.get("is_duplicate"):
+            atype_title = "Potential Duplicate Work Claim"
+        elif (row.get("dev_work_type_median_pct") or 0) > 100:
+            atype_title = "Severe Cost Inflation / Overrun"
+        elif not row.get("has_images"):
+            atype_title = "Visual Compliance Gap / Missing Photos"
+        elif row.get("is_high_ida_concentration"):
+            atype_title = "IDA Monopoly Concentration Risk"
+        else:
+            atype_title = "Multi-Factor Expenditure Anomaly"
+
+        alerts_list.append({
+            "alert_id": f"ALT-{wid}",
+            "project_id": wid,
+            "project_name": str(row["work_description"]),
+            "alert_type": atype_title,
+            "severity": sev,
+            "risk_score": score,
+            "sanctioned_amount": float(row.get("sanctioned_amount", row["final_amount"])),
+            "expenditure": float(row["final_amount"]),
+            "state": str(row["state"]),
+            "district": str(row.get("district", row["constituency"])),
+            "mp_name": str(row["mp_name"]),
+            "date_detected": str(row.get("completed_date", "2026-08-25")),
+            "reasons": reasons,
+            "main_reason": reasons[0] if reasons else "Elevated risk parameters",
+            "status": "UNRESOLVED",
+            "has_images": bool(row.get("has_images"))
+        })
+
+    return {
+        "total_alerts": len(df_scoped),
+        "returned": len(alerts_list),
+        "alerts": alerts_list
+    }
+
+@app.get("/api/states")
+def get_api_states():
+    """Returns list of states with aggregated performance & risk indicators."""
+    df = get_risk_scored_data()
+    summary = []
+    for state_name, group in df.groupby("state"):
+        tot_w = len(group)
+        tot_sanc = float(group["sanctioned_amount"].sum()) if "sanctioned_amount" in group.columns else float(group["final_amount"].sum()) * 1.05
+        tot_exp = float(group["final_amount"].sum())
+        high_cnt = int((group["risk_level"].isin(["HIGH", "CRITICAL"])).sum()) if "risk_level" in group.columns else int((group["risk_score"] >= 70).sum())
+        delayed_cnt = int((group["is_delayed"] == True).sum()) if "is_delayed" in group.columns else 0
+
+        summary.append({
+            "state": str(state_name).strip(),
+            "total_projects": tot_w,
+            "total_sanctioned_crores": round(tot_sanc / 1e7, 2),
+            "total_expenditure_crores": round(tot_exp / 1e7, 2),
+            "fund_utilization_pct": round((tot_exp / max(1.0, tot_sanc)) * 100.0, 1),
+            "delayed_projects": delayed_cnt,
+            "high_risk_projects": high_cnt,
+            "avg_risk_score": round(float(group["risk_score"].mean()), 1),
+            "risk_level": "HIGH" if (high_cnt / tot_w) > 0.25 else "MEDIUM" if (high_cnt / tot_w) > 0.10 else "LOW"
+        })
+    summary.sort(key=lambda x: x["total_projects"], reverse=True)
+    return summary
+
+@app.get("/api/districts")
+def get_api_districts(state: Optional[str] = None):
+    """Returns district comparison list within a state or nationally."""
+    df = get_risk_scored_data()
+    if state and state.lower() != "all":
+        df = df[df["state"].astype(str).str.strip().str.lower() == state.strip().lower()]
+
+    dist_col = "district" if "district" in df.columns else "constituency"
+    summary = []
+
+    for (st_name, dist_name), group in df.groupby(["state", dist_col]):
+        tot_w = len(group)
+        tot_sanc = float(group["sanctioned_amount"].sum()) if "sanctioned_amount" in group.columns else float(group["final_amount"].sum()) * 1.05
+        tot_exp = float(group["final_amount"].sum())
+        high_cnt = int((group["risk_score"] >= 70).sum())
+        delayed_cnt = int((group["is_delayed"] == True).sum()) if "is_delayed" in group.columns else 0
+
+        summary.append({
+            "district": str(dist_name).strip(),
+            "state": str(st_name).strip(),
+            "total_projects": tot_w,
+            "total_sanctioned_crores": round(tot_sanc / 1e7, 2),
+            "total_expenditure_crores": round(tot_exp / 1e7, 2),
+            "fund_utilization_pct": round((tot_exp / max(1.0, tot_sanc)) * 100.0, 1),
+            "delayed_projects": delayed_cnt,
+            "high_risk_projects": high_cnt,
+            "avg_risk_score": round(float(group["risk_score"].mean()), 1),
+            "risk_level": "CRITICAL" if float(group["risk_score"].mean()) >= 60 else "HIGH" if float(group["risk_score"].mean()) >= 40 else "MEDIUM" if float(group["risk_score"].mean()) >= 25 else "LOW"
+        })
+
+    summary.sort(key=lambda x: x["total_projects"], reverse=True)
+    return summary
+
+@app.get("/api/analytics")
+def get_api_analytics(
+    role: str = Query("ministry"),
+    state: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    mp_name: Optional[str] = Query(None)
+):
+    """Returns analytics trends: monthly expenditure, work-type distribution, and risk bands."""
+    df = get_risk_scored_data()
+    df_scoped = _filter_by_role(df, role, state, district, mp_name)
+
+    # 1. Work type distribution
+    wt_dist = []
+    for wt, group in df_scoped.groupby("work_type"):
+        wt_dist.append({
+            "work_type": str(wt),
+            "count": len(group),
+            "expenditure_crores": round(float(group["final_amount"].sum()) / 1e7, 2),
+            "avg_cost_lakhs": round(float(group["final_amount"].mean()) / 100000.0, 2),
+            "high_risk_count": int((group["risk_score"] >= 70).sum())
+        })
+    wt_dist.sort(key=lambda x: x["count"], reverse=True)
+
+    # 2. Risk distribution
+    critical_cnt = int((df_scoped["risk_score"] >= 85).sum())
+    high_cnt = int(((df_scoped["risk_score"] >= 70) & (df_scoped["risk_score"] < 85)).sum())
+    med_cnt = int(((df_scoped["risk_score"] >= 40) & (df_scoped["risk_score"] < 70)).sum())
+    low_cnt = int((df_scoped["risk_score"] < 40).sum())
+
+    risk_dist = [
+        {"name": "Low Risk (<40)", "count": low_cnt, "color": "#16A34A"},
+        {"name": "Medium Risk (40-69)", "count": med_cnt, "color": "#F59E0B"},
+        {"name": "High Risk (70-84)", "count": high_cnt, "color": "#EA580C"},
+        {"name": "Critical Risk (≥85)", "count": critical_cnt, "color": "#DC2626"}
+    ]
+
+    # 3. Monthly trend
+    df_scoped["month_year"] = pd.to_datetime(df_scoped["completed_date"], errors="coerce").dt.strftime("%Y-%m")
+    monthly_trend = []
+    for ym, group in df_scoped.dropna(subset=["month_year"]).groupby("month_year"):
+        monthly_trend.append({
+            "month": str(ym),
+            "completed_projects": len(group),
+            "expenditure_crores": round(float(group["final_amount"].sum()) / 1e7, 2),
+            "high_risk_count": int((group["risk_score"] >= 70).sum())
+        })
+    monthly_trend.sort(key=lambda x: x["month"])
+
+    return {
+        "work_type_distribution": wt_dist,
+        "risk_distribution": risk_dist,
+        "monthly_trend": monthly_trend[-12:] # Last 12 months
+    }
+
+@app.get("/api/map/projects")
+def get_map_projects(
+    state: Optional[str] = Query(None),
+    district: Optional[str] = Query(None),
+    risk_level: Optional[str] = Query(None),
+    limit: int = Query(300, ge=1, le=1000)
+):
+    """Returns geospatial coordinate markers for interactive map visualization."""
+    df = get_risk_scored_data()
+    if state and state.lower() != "all":
+        df = df[df["state"].astype(str).str.strip().str.lower() == state.strip().lower()]
+    if district and district.lower() != "all":
+        df = df[df["district"].astype(str).str.strip().str.lower() == district.strip().lower()]
+    if risk_level and risk_level.upper() != "ALL":
+        df = df[df["risk_level"].astype(str).str.upper() == risk_level.strip().upper()]
+
+    sampled = df.head(limit)
+    markers = []
+
+    for _, row in sampled.iterrows():
+        score = float(row["risk_score"])
+        sev = "CRITICAL" if score >= 85 else "HIGH" if score >= 70 else "MEDIUM" if score >= 40 else "LOW"
+        markers.append({
+            "project_id": str(row["work_id"]),
+            "project_name": str(row["work_description"]),
+            "work_type": str(row["work_type"]),
+            "state": str(row["state"]),
+            "district": str(row.get("district", row["constituency"])),
+            "mp_name": str(row["mp_name"]),
+            "expenditure": float(row["final_amount"]),
+            "progress_pct": float(row.get("progress_pct", 100)),
+            "latitude": float(row.get("latitude", 20.5937)),
+            "longitude": float(row.get("longitude", 78.9629)),
+            "risk_score": score,
+            "risk_level": sev,
+            "has_images": bool(row.get("has_images"))
+        })
+
+    return {
+        "total_markers": len(markers),
+        "markers": markers
+    }
+
+# ----------------------------------------------------
+# COMPATIBILITY ALIASES (Preserving all earlier routes)
+# ----------------------------------------------------
 
 @app.get("/")
 def root():
     return {
         "status": "online",
-        "system": "MPLADS AI Anomaly & Fraud Detection Prototype",
+        "system": "MPLADS AI Monitoring & Decision Support Platform",
         "problem_statement": "SIH26102",
         "docs_url": "/docs"
     }
 
 @app.get("/summary/kpis")
 def get_national_kpis():
-    """National overview summary KPIs."""
-    df = get_risk_scored_data()
-    total_works = len(df)
-    total_amount = float(df["final_amount"].sum())
-    high_risk_count = int((df["risk_category"] == "HIGH").sum())
-    med_risk_count = int((df["risk_category"] == "MEDIUM").sum())
-    low_risk_count = int((df["risk_category"] == "LOW").sum())
-    avg_risk_score = round(float(df["risk_score"].mean()), 2)
-    missing_images_count = int((~df["has_images"].astype(bool)).sum())
-    duplicate_count = int(df["is_duplicate"].sum())
-    cost_outlier_count = int(df["is_cost_outlier"].sum())
-
-    return {
-        "total_works": total_works,
-        "total_amount_inr": total_amount,
-        "total_amount_crores": round(total_amount / 1e7, 2),
-        "high_risk_count": high_risk_count,
-        "medium_risk_count": med_risk_count,
-        "low_risk_count": low_risk_count,
-        "high_risk_percentage": round((high_risk_count / total_works) * 100, 1) if total_works > 0 else 0,
-        "avg_risk_score": avg_risk_score,
-        "missing_images_count": missing_images_count,
-        "duplicate_works_count": duplicate_count,
-        "cost_outliers_count": cost_outlier_count,
-        "total_mps": int(df["mp_name"].nunique()),
-        "total_states": int(df["state"].nunique())
-    }
+    return get_dashboard_summary(role="ministry")
 
 @app.get("/works")
-def get_works(
-    state: Optional[str] = Query(None, description="Filter by State"),
-    mp_name: Optional[str] = Query(None, description="Filter by MP Name"),
-    work_type: Optional[str] = Query(None, description="Filter by Work Type"),
-    risk_category: Optional[str] = Query(None, description="Filter by Risk Category: HIGH, MEDIUM, LOW"),
-    min_risk_score: Optional[float] = Query(None, description="Filter by minimum risk score (0-100)"),
-    search: Optional[str] = Query(None, description="Search in description, ID, MP, or agency"),
+def get_works_compat(
+    state: Optional[str] = Query(None),
+    mp_name: Optional[str] = Query(None),
+    work_type: Optional[str] = Query(None),
+    risk_category: Optional[str] = Query(None),
+    min_risk_score: Optional[float] = Query(None),
+    search: Optional[str] = Query(None),
     limit: int = Query(500, ge=1, le=5000),
     offset: int = Query(0, ge=0)
 ):
-    """Returns filtered risk-scored works list with robust search & pagination."""
-    df = get_risk_scored_data()
-
-    if state and state.strip().lower() != "all states":
-        st_clean = state.strip().lower()
-        df = df[df["state"].str.strip().str.lower() == st_clean]
-
-    if mp_name:
-        mp_clean = mp_name.strip().lower()
-        df = df[df["mp_name"].str.strip().str.lower().str.contains(mp_clean, na=False) | (df["mp_name"].str.strip().str.lower() == mp_clean)]
-
-    if work_type and work_type.strip().lower() != "all categories" and work_type.strip().lower() != "all work types":
-        wt_clean = work_type.strip().lower()
-        df = df[df["work_type"].str.strip().str.lower() == wt_clean]
-
-    if risk_category and risk_category.strip().upper() != "ALL RISK LEVELS":
-        rc_clean = risk_category.strip().upper().split()[0]
-        df = df[df["risk_category"].str.upper() == rc_clean]
-
-    if min_risk_score is not None:
-        df = df[df["risk_score"] >= float(min_risk_score)]
-
-    if search:
-        s = search.strip().lower()
-        df = df[
-            df["work_description"].astype(str).str.lower().str.contains(s, na=False) |
-            df["work_id"].astype(str).str.lower().str.contains(s, na=False) |
-            df["mp_name"].astype(str).str.lower().str.contains(s, na=False) |
-            df["constituency"].astype(str).str.lower().str.contains(s, na=False) |
-            df["ida"].astype(str).str.lower().str.contains(s, na=False) |
-            df["state"].astype(str).str.lower().str.contains(s, na=False)
-        ]
-
-    total_matched = len(df)
-    paged_df = df.iloc[offset: offset + limit]
-
-    records = [_clean_record(r) for r in paged_df.to_dict(orient="records")]
-    return {
-        "total": total_matched,
-        "limit": limit,
-        "offset": offset,
-        "data": records
-    }
+    res = get_projects(
+        role="ministry",
+        state=state,
+        mp_name=mp_name,
+        work_type=work_type,
+        risk_level=risk_category,
+        min_amount=None,
+        search=search,
+        limit=limit,
+        offset=offset
+    )
+    return {"total": res["total"], "limit": limit, "offset": offset, "data": res["projects"]}
 
 @app.get("/works/{work_id}")
-def get_work_by_id(work_id: str):
-    """Returns comprehensive detail and risk breakdown for a specific work."""
-    df = get_risk_scored_data()
-    wid_clean = work_id.strip().upper()
-    match = df[df["work_id"].astype(str).str.strip().str.upper() == wid_clean]
-    if match.empty:
-        raise HTTPException(status_code=404, detail=f"Work with ID '{work_id}' not found.")
-    
-    record = _clean_record(match.iloc[0].to_dict())
-    
-    matched_works_details = []
-    if record.get("matched_work_ids"):
-        ids = [i.strip().upper() for i in str(record["matched_work_ids"]).split(",") if i.strip()]
-        for mid in ids[:5]:
-            dup_row = df[df["work_id"].astype(str).str.strip().str.upper() == mid]
-            if not dup_row.empty:
-                matched_works_details.append(_clean_record(dup_row.iloc[0].to_dict()))
-
-    record["matched_works_details"] = matched_works_details
-    return record
+def get_work_compat(work_id: str):
+    return get_project_detail(work_id)
 
 @app.get("/summary/state")
-def get_state_summary():
-    """Aggregated stats per state: total works, expenditure, avg risk, high risk count, top IDA."""
-    df = get_risk_scored_data()
-    
-    summary = []
-    for state_name, group in df.groupby("state"):
-        tot_works = len(group)
-        tot_amt = float(group["final_amount"].sum())
-        avg_risk = round(float(group["risk_score"].mean()), 2)
-        high_risk_cnt = int((group["risk_category"] == "HIGH").sum())
-        med_risk_cnt = int((group["risk_category"] == "MEDIUM").sum())
-        low_risk_cnt = int((group["risk_category"] == "LOW").sum())
-        
-        top_ida = group["ida"].mode()[0] if not group["ida"].empty else "N/A"
-        top_ida_share = round((group["ida"] == top_ida).sum() / tot_works * 100, 1)
-
-        summary.append({
-            "state": str(state_name).strip(),
-            "total_works": tot_works,
-            "total_amount_inr": tot_amt,
-            "total_amount_crores": round(tot_amt / 1e7, 2),
-            "avg_risk_score": avg_risk,
-            "high_risk_count": high_risk_cnt,
-            "medium_risk_count": med_risk_cnt,
-            "low_risk_count": low_risk_cnt,
-            "high_risk_rate_pct": round((high_risk_cnt / tot_works) * 100, 1),
-            "top_ida": str(top_ida).strip(),
-            "top_ida_share_pct": top_ida_share
-        })
-
-    summary.sort(key=lambda x: x["total_works"], reverse=True)
-    return summary
+def get_state_summary_compat():
+    return get_api_states()
 
 @app.get("/summary/mp")
-def get_mp_summary(state: Optional[str] = None):
-    """Aggregated stats per MP."""
+def get_mp_summary_compat(state: Optional[str] = None):
     df = get_risk_scored_data()
     if state and state.strip().lower() != "all states":
-        st_clean = state.strip().lower()
-        df = df[df["state"].str.strip().str.lower() == st_clean]
+        df = df[df["state"].str.strip().str.lower() == state.strip().lower()]
 
     summary = []
     for mp_name, group in df.groupby("mp_name"):
         tot_works = len(group)
         tot_amt = float(group["final_amount"].sum())
         avg_risk = round(float(group["risk_score"].mean()), 2)
-        high_risk_cnt = int((group["risk_category"] == "HIGH").sum())
-        constituency = group["constituency"].iloc[0]
-        state_name = group["state"].iloc[0]
-        house = group["house"].iloc[0]
-        dup_count = int(group["is_duplicate"].sum())
-        no_img_count = int((~group["has_images"].astype(bool)).sum())
+        high_risk_cnt = int((group["risk_score"] >= 70).sum())
 
         summary.append({
             "mp_name": str(mp_name).strip(),
-            "constituency": str(constituency).strip(),
-            "state": str(state_name).strip(),
-            "house": str(house).strip(),
+            "constituency": str(group["constituency"].iloc[0]).strip(),
+            "state": str(group["state"].iloc[0]).strip(),
+            "house": str(group["house"].iloc[0]).strip(),
             "total_works": tot_works,
             "total_amount_inr": tot_amt,
             "total_amount_crores": round(tot_amt / 1e7, 2),
             "avg_risk_score": avg_risk,
             "high_risk_count": high_risk_cnt,
-            "duplicate_works_count": dup_count,
-            "missing_images_count": no_img_count
+            "duplicate_works_count": int(group["is_duplicate"].sum()),
+            "missing_images_count": int((~group["has_images"].astype(bool)).sum())
         })
-
     summary.sort(key=lambda x: x["total_works"], reverse=True)
     return summary
 
 @app.get("/summary/benchmarks")
-def get_benchmarks(mp_name: str, state: Optional[str] = None):
-    """Returns MP average cost vs State average cost vs National average cost per work type."""
+def get_benchmarks_compat(mp_name: str, state: Optional[str] = None):
     df = get_risk_scored_data()
     mp_clean = mp_name.strip().lower()
     df_mp = df[df["mp_name"].str.strip().str.lower() == mp_clean]
-    
     if df_mp.empty:
-        # Fallback substring search
         df_mp = df[df["mp_name"].str.strip().str.lower().str.contains(mp_clean, na=False)]
 
     mp_state = state if state else (df_mp["state"].iloc[0] if not df_mp.empty else "National")
@@ -268,13 +608,12 @@ def get_benchmarks(mp_name: str, state: Optional[str] = None):
         nat_avg = float(nat_works["final_amount"].mean()) if not nat_works.empty else 0.0
         st_avg = float(st_works["final_amount"].mean()) if not st_works.empty else nat_avg
         mp_avg = float(mp_works["final_amount"].mean()) if not mp_works.empty else 0.0
-        mp_cnt = len(mp_works)
 
         benchmarks.append({
             "work_type": wt,
             "mp_avg_cost_inr": round(mp_avg, 2),
             "mp_avg_cost_lakhs": round(mp_avg / 100000.0, 2),
-            "mp_works_count": mp_cnt,
+            "mp_works_count": len(mp_works),
             "state_avg_cost_inr": round(st_avg, 2),
             "state_avg_cost_lakhs": round(st_avg / 100000.0, 2),
             "national_avg_cost_inr": round(nat_avg, 2),
@@ -289,45 +628,22 @@ def get_benchmarks(mp_name: str, state: Optional[str] = None):
     }
 
 @app.get("/summary/work_types")
-def get_work_type_summary():
-    """Stats per work type category."""
-    df = get_risk_scored_data()
-    summary = []
-    for wtype, group in df.groupby("work_type"):
-        tot_works = len(group)
-        tot_amt = float(group["final_amount"].sum())
-        avg_cost = float(group["final_amount"].mean())
-        median_cost = float(group["final_amount"].median())
-        avg_risk = round(float(group["risk_score"].mean()), 2)
-        high_risk_cnt = int((group["risk_category"] == "HIGH").sum())
-
-        summary.append({
-            "work_type": str(wtype).strip(),
-            "total_works": tot_works,
-            "total_amount_crores": round(tot_amt / 1e7, 2),
-            "average_cost_inr": round(avg_cost, -2),
-            "median_cost_inr": round(median_cost, -2),
-            "avg_risk_score": avg_risk,
-            "high_risk_count": high_risk_cnt
-        })
-
-    summary.sort(key=lambda x: x["total_works"], reverse=True)
-    return summary
+def get_work_type_summary_compat():
+    analytics = get_api_analytics()
+    return analytics["work_type_distribution"]
 
 @app.get("/summary/ida")
-def get_ida_summary(state: Optional[str] = None):
-    """IDA concentration metrics."""
+def get_ida_summary_compat(state: Optional[str] = None):
     df = get_risk_scored_data()
     if state and state.strip().lower() != "all states":
-        st_clean = state.strip().lower()
-        df = df[df["state"].str.strip().str.lower() == st_clean]
+        df = df[df["state"].str.strip().str.lower() == state.strip().lower()]
 
     summary = []
     for (state_name, ida_name), group in df.groupby(["state", "ida"]):
         tot_works = len(group)
         tot_amt = float(group["final_amount"].sum())
         avg_risk = round(float(group["risk_score"].mean()), 2)
-        high_risk_cnt = int((group["risk_category"] == "HIGH").sum())
+        high_risk_cnt = int((group["risk_score"] >= 70).sum())
         
         st_total_works = len(df[df["state"] == state_name])
         st_total_amt = df[df["state"] == state_name]["final_amount"].sum()
@@ -351,55 +667,37 @@ def get_ida_summary(state: Optional[str] = None):
     return summary
 
 @app.get("/alerts")
-def get_alerts(
+def get_alerts_compat(
     min_risk_score: float = Query(70.0, ge=0, le=100),
     state: Optional[str] = Query(None),
     work_type: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=500)
 ):
-    """Top highest-risk works across the dataset for proactive audit alerting."""
-    df = get_risk_scored_data()
-    df_filtered = df[df["risk_score"] >= min_risk_score]
-
-    if state and state.strip().lower() != "all states":
-        df_filtered = df_filtered[df_filtered["state"].str.strip().str.lower() == state.strip().lower()]
-
-    if work_type and work_type.strip().lower() != "all work types" and work_type.strip().lower() != "all categories":
-        df_filtered = df_filtered[df_filtered["work_type"].str.strip().str.lower() == work_type.strip().lower()]
-
-    if search:
-        s = search.strip().lower()
-        df_filtered = df_filtered[
-            df_filtered["work_description"].astype(str).str.lower().str.contains(s, na=False) |
-            df_filtered["work_id"].astype(str).str.lower().str.contains(s, na=False) |
-            df_filtered["mp_name"].astype(str).str.lower().str.contains(s, na=False) |
-            df_filtered["constituency"].astype(str).str.lower().str.contains(s, na=False) |
-            df_filtered["ida"].astype(str).str.lower().str.contains(s, na=False)
-        ]
-
-    alerts = df_filtered.head(limit)
-    records = [_clean_record(r) for r in alerts.to_dict(orient="records")]
+    res = get_api_alerts(
+        role="ministry",
+        state=state,
+        severity="CRITICAL" if min_risk_score >= 85 else "HIGH" if min_risk_score >= 70 else None,
+        limit=limit
+    )
     return {
-        "total_alerts": len(df_filtered),
+        "total_alerts": res["total_alerts"],
         "threshold": min_risk_score,
-        "returned": len(records),
-        "alerts": records
+        "returned": res["returned"],
+        "alerts": res["alerts"]
     }
 
 @app.get("/validation/report")
 def get_validation():
-    """Returns model validation metrics and synthetic anomaly experiment results."""
     return get_validation_report()
 
 @app.post("/recalculate")
 def recalculate_risk_scores():
-    """Recomputes the risk engine on the latest dataset."""
     engine = MPLADSRiskEngine()
     df_res = engine.evaluate_all_risks()
     return {
         "status": "success",
         "message": f"Successfully re-evaluated risk models on {len(df_res)} records.",
-        "high_risk_count": int((df_res["risk_category"] == "HIGH").sum()),
+        "high_risk_count": int((df_res["risk_score"] >= 70).sum()),
         "avg_risk_score": round(float(df_res["risk_score"].mean()), 2)
     }

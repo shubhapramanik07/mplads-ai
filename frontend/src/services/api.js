@@ -1,22 +1,83 @@
 /**
- * API Service for MPLADS AI Anomaly & Fraud Detection Engine.
+ * Comprehensive API Service for MPLADS AI Monitoring & Decision Support Platform.
  */
 const API_BASE_URL = 'http://127.0.0.1:8001';
 
-export async function fetchKPIs() {
+export async function fetchDashboardSummary(role = 'ministry', state = '', district = '', mpName = '') {
   try {
-    const res = await fetch(`${API_BASE_URL}/summary/kpis`);
+    const query = new URLSearchParams({ role });
+    if (state && state !== 'All') query.append('state', state);
+    if (district && district !== 'All') query.append('district', district);
+    if (mpName && mpName !== 'All') query.append('mp_name', mpName);
+
+    const res = await fetch(`${API_BASE_URL}/api/dashboard/summary?${query.toString()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.error('Error fetching KPIs:', err);
+    console.error('Error fetching dashboard summary:', err);
     return null;
   }
 }
 
-export async function fetchStateSummaries() {
+export async function fetchProjects(params = {}) {
   try {
-    const res = await fetch(`${API_BASE_URL}/summary/state`);
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'ALL' && v !== 'All') {
+        query.append(k, v);
+      }
+    });
+    const res = await fetch(`${API_BASE_URL}/api/projects?${query.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching projects:', err);
+    return { total: 0, projects: [] };
+  }
+}
+
+export async function fetchProjectDetail(projectId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching project detail:', err);
+    return null;
+  }
+}
+
+export async function fetchProjectRisk(projectId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/risk`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching project risk:', err);
+    return null;
+  }
+}
+
+export async function fetchApiAlerts(params = {}) {
+  try {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'ALL' && v !== 'All') {
+        query.append(k, v);
+      }
+    });
+    const res = await fetch(`${API_BASE_URL}/api/alerts?${query.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching alerts:', err);
+    return { total_alerts: 0, alerts: [] };
+  }
+}
+
+export async function fetchStates() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/states`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -25,83 +86,60 @@ export async function fetchStateSummaries() {
   }
 }
 
+export async function fetchDistricts(state = '') {
+  try {
+    const url = state && state !== 'All' ? `${API_BASE_URL}/api/districts?state=${encodeURIComponent(state)}` : `${API_BASE_URL}/api/districts`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching districts:', err);
+    return [];
+  }
+}
+
+export async function fetchAnalytics(role = 'ministry', state = '', district = '', mpName = '') {
+  try {
+    const query = new URLSearchParams({ role });
+    if (state && state !== 'All') query.append('state', state);
+    if (district && district !== 'All') query.append('district', district);
+    if (mpName && mpName !== 'All') query.append('mp_name', mpName);
+
+    const res = await fetch(`${API_BASE_URL}/api/analytics?${query.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching analytics:', err);
+    return { work_type_distribution: [], risk_distribution: [], monthly_trend: [] };
+  }
+}
+
+export async function fetchMapProjects(params = {}) {
+  try {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'ALL' && v !== 'All') {
+        query.append(k, v);
+      }
+    });
+    const res = await fetch(`${API_BASE_URL}/api/map/projects?${query.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Error fetching map projects:', err);
+    return { total_markers: 0, markers: [] };
+  }
+}
+
 export async function fetchMPSummaries(state = '') {
   try {
-    const url = state ? `${API_BASE_URL}/summary/mp?state=${encodeURIComponent(state)}` : `${API_BASE_URL}/summary/mp`;
+    const url = state && state !== 'All' ? `${API_BASE_URL}/summary/mp?state=${encodeURIComponent(state)}` : `${API_BASE_URL}/summary/mp`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
     console.error('Error fetching MPs:', err);
     return [];
-  }
-}
-
-export async function fetchWorkTypes() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/summary/work_types`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error('Error fetching work types:', err);
-    return [];
-  }
-}
-
-export async function fetchIDASummaries(state = '') {
-  try {
-    const url = state ? `${API_BASE_URL}/summary/ida?state=${encodeURIComponent(state)}` : `${API_BASE_URL}/summary/ida`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error('Error fetching IDA summaries:', err);
-    return [];
-  }
-}
-
-export async function fetchWorks(params = {}) {
-  try {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        query.append(k, v);
-      }
-    });
-    const res = await fetch(`${API_BASE_URL}/works?${query.toString()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error('Error fetching works:', err);
-    return { total: 0, data: [] };
-  }
-}
-
-export async function fetchWorkById(workId) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/works/${encodeURIComponent(workId)}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error('Error fetching work detail:', err);
-    return null;
-  }
-}
-
-export async function fetchAlerts(params = {}) {
-  try {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        query.append(k, v);
-      }
-    });
-    const res = await fetch(`${API_BASE_URL}/alerts?${query.toString()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error('Error fetching alerts:', err);
-    return { total_alerts: 0, alerts: [] };
   }
 }
 

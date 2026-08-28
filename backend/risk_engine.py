@@ -1,6 +1,6 @@
 """
-Accurate & Calibrated ML Risk Engine for MPLADS Anomaly, Fraud and Inefficiency Detection.
-Computes 0-100 explainable risk scores combining Isolation Forest, TF-IDF NLP, Compliance, and IDA Concentration.
+Accurate & Calibrated ML + Rule-Based Risk Engine for MPLADS Anomaly, Fraud and Inefficiency Detection.
+Computes 0-100 explainable risk scores combining Isolation Forest, Rule Engine, TF-IDF NLP, Compliance, and IDA Concentration.
 """
 import os
 import json
@@ -36,13 +36,10 @@ class MPLADSRiskEngine:
         )
 
     def detect_cost_outliers(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, List[List[str]]]:
-        """
-        Calculates granular cost risk score (0-100) using Isolation Forest & peer deviations.
-        """
+        """Calculates granular cost risk score (0-100) using Isolation Forest & peer deviations."""
         features = df[["final_amount", "dev_work_type_median_pct", "dev_state_median_pct"]].copy()
         features = features.replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
-        # Fit Isolation Forest on multidimensional expenditure features
         self.iso_forest.fit(features)
         raw_scores = self.iso_forest.decision_function(features)
         
@@ -61,19 +58,19 @@ class MPLADSRiskEngine:
         amts = df["final_amount"].to_numpy()
         wtypes = df["work_type"].to_numpy()
         states = df["state"].to_numpy()
+        sanc_amts = df["sanctioned_amount"].to_numpy() if "sanctioned_amount" in df.columns else amts
 
         for idx in range(len(df)):
             reasons = []
             wt_dev = float(wt_devs[idx])
             st_dev = float(st_devs[idx])
             amt = float(amts[idx])
+            sanc = float(sanc_amts[idx])
             wtype = str(wtypes[idx])
             state = str(states[idx])
             
-            # 1. Base ML Isolation Forest component (0 - 35 pts)
             if_contrib = float(norm_anomaly[idx]) * 35.0
 
-            # 2. Work type peer group deviation contribution (0 - 45 pts)
             wt_contrib = 0.0
             if wt_dev > 150.0:
                 wt_contrib = 45.0
@@ -85,13 +82,17 @@ class MPLADSRiskEngine:
                 wt_contrib = (wt_dev - 35.0) * 0.35
                 reasons.append(f"Moderate cost variance: +{wt_dev:.1f}% above peer median for '{wtype}'")
 
-            # 3. State peer baseline deviation (0 - 20 pts)
             st_contrib = 0.0
             if st_dev > 100.0:
                 st_contrib = min(20.0, (st_dev - 100.0) * 0.15 + 10.0)
                 reasons.append(f"Cost is {st_dev:+.1f}% above overall state median expenditure in {state}")
 
-            # 4. Scheme ceiling check (near ₹50L single-work limit)
+            # Cost overrun rule
+            if amt > sanc and sanc > 0:
+                overrun_pct = round(((amt - sanc) / sanc) * 100, 1)
+                wt_contrib = min(50.0, wt_contrib + 15.0)
+                reasons.append(f"Cost overrun detected: Expenditure exceeds sanctioned amount by ₹{(amt - sanc):,.0f} (+{overrun_pct}%)")
+
             if amt >= 4500000.0:
                 wt_contrib = min(45.0, wt_contrib + 10.0)
                 reasons.append(f"Near-maximum ceiling allocation of ₹{amt:,.0f}")
@@ -106,9 +107,7 @@ class MPLADSRiskEngine:
         return pd.Series(is_cost_outlier, index=df.index), pd.Series(cost_risk_scores, index=df.index), cost_reasons
 
     def detect_duplicate_works(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, List[List[str]], pd.Series]:
-        """
-        Calculates duplicate work NLP risk score (0-100) using TF-IDF + Cosine Similarity grouped by MP.
-        """
+        """Calculates duplicate work NLP risk score (0-100) using TF-IDF + Cosine Similarity grouped by MP."""
         is_dup_list = [False] * len(df)
         dup_scores = [0.0] * len(df)
         dup_matches_dict = {i: [] for i in range(len(df))}
@@ -140,7 +139,6 @@ class MPLADSRiskEngine:
                 is_dup_list[idx_i] = True
                 is_dup_list[idx_j] = True
 
-                # Accurate continuous score scaling
                 if sim >= 0.90:
                     score_val = 90.0 + (sim - 0.90) * 100.0
                 elif sim >= 0.80:
@@ -182,9 +180,7 @@ class MPLADSRiskEngine:
         )
 
     def analyze_agency_concentration(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, List[List[str]], pd.DataFrame]:
-        """
-        Calculates Implementing District Agency (IDA) monopoly risk score (0-100).
-        """
+        """Calculates Implementing District Agency (IDA) monopoly risk score (0-100)."""
         state_totals = df.groupby("state").agg(
             total_state_works=("work_id", "count"),
             total_state_amount=("final_amount", "sum")
@@ -254,21 +250,22 @@ class MPLADSRiskEngine:
         )
 
     def compute_compliance_risk(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, List[List[str]]]:
-        """
-        Calculates documentation & photo proof compliance risk score (0-100).
-        """
+        """Calculates documentation & photo proof compliance risk score (0-100)."""
         is_non_compliant = ~df["has_images"].astype(bool)
         comp_scores = []
         comp_reasons = []
 
         has_imgs = df["has_images"].to_numpy()
         amts = df["final_amount"].to_numpy()
+        is_delays = df["is_delayed"].to_numpy() if "is_delayed" in df.columns else [False] * len(df)
 
         for idx in range(len(df)):
             reasons = []
             score = 0.0
+            amt = float(amts[idx])
+            delayed = bool(is_delays[idx])
+
             if not bool(has_imgs[idx]):
-                amt = float(amts[idx])
                 if amt >= 2500000:
                     score = 80.0
                     reasons.append(f"High-value project (₹{amt:,.0f}) lacking mandatory geo-tagged inspection photos")
@@ -278,6 +275,11 @@ class MPLADSRiskEngine:
                 else:
                     score = 35.0
                     reasons.append("Missing mandatory geo-tagged completion photos (documentation gap)")
+
+            if delayed:
+                score = min(100.0, score + 25.0)
+                reasons.append("Project milestone completion significantly delayed beyond expected schedule")
+
             comp_scores.append(score)
             comp_reasons.append(reasons)
 
@@ -301,6 +303,7 @@ class MPLADSRiskEngine:
 
         final_risk_scores = []
         risk_categories = []
+        risk_levels = []
         combined_reasons_json = []
 
         c_arr = cost_scores.to_numpy()
@@ -322,14 +325,14 @@ class MPLADSRiskEngine:
                 (i_score * 0.15)
             )
 
-            # 2. Dominant Driver Escalation: severe single violation prevents score dilution
+            # 2. Dominant Driver Escalation
             max_driver = max(c_score, d_score)
             if max_driver >= 80.0:
                 weighted_score = max(weighted_score, max_driver * 0.88)
             elif max_driver >= 65.0:
                 weighted_score = max(weighted_score, max_driver * 0.75)
 
-            # 3. Compound Anomaly Surge: when multiple red flags coincide
+            # 3. Compound Anomaly Surge
             active_flags = sum([
                 1 if c_score >= 45.0 else 0,
                 1 if d_score >= 45.0 else 0,
@@ -344,13 +347,19 @@ class MPLADSRiskEngine:
             final_score = round(min(100.0, max(0.0, weighted_score)), 1)
             final_risk_scores.append(final_score)
 
-            # 4. Strict Risk Classification
-            if final_score >= 70.0:
+            # 4. Strict 4-Tier Risk Classification
+            if final_score >= 85.0:
+                risk_categories.append("CRITICAL")
+                risk_levels.append("CRITICAL")
+            elif final_score >= 70.0:
                 risk_categories.append("HIGH")
+                risk_levels.append("HIGH")
             elif final_score >= 40.0:
                 risk_categories.append("MEDIUM")
+                risk_levels.append("MEDIUM")
             else:
                 risk_categories.append("LOW")
+                risk_levels.append("LOW")
 
             # 5. Compile Plain-English Reasons
             all_reasons = []
@@ -367,6 +376,7 @@ class MPLADSRiskEngine:
         df_output = df_enriched.copy()
         df_output["risk_score"] = final_risk_scores
         df_output["risk_category"] = risk_categories
+        df_output["risk_level"] = risk_levels
         df_output["cost_risk_score"] = cost_scores
         df_output["duplicate_risk_score"] = dup_scores
         df_output["compliance_risk_score"] = comp_scores
@@ -377,6 +387,7 @@ class MPLADSRiskEngine:
         df_output["is_high_ida_concentration"] = is_high_ida
         df_output["matched_work_ids"] = matched_ids
         df_output["risk_reasons"] = combined_reasons_json
+        df_output["risk_factors"] = combined_reasons_json
 
         df_output = df_output.sort_values(by="risk_score", ascending=False).reset_index(drop=True)
 
@@ -399,4 +410,4 @@ if __name__ == "__main__":
     engine = MPLADSRiskEngine()
     df_res = engine.evaluate_all_risks()
     print("Risk score summary:")
-    print(df_res["risk_category"].value_counts())
+    print(df_res["risk_level"].value_counts())
