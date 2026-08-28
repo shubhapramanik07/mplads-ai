@@ -12,7 +12,8 @@ import {
   ShieldAlert,
   Download,
   Eye,
-  SlidersHorizontal
+  SlidersHorizontal,
+  UserCheck
 } from 'lucide-react';
 import RiskBadge from '../components/RiskBadge';
 import { fetchProjects, fetchStates, fetchDistricts, formatINR } from '../services/api';
@@ -34,15 +35,17 @@ export default function WorkExplorerView({ currentRole, selectedScope, onSelectP
 
   useEffect(() => {
     async function loadMeta() {
-      const [stList, distList] = await Promise.all([
-        fetchStates(),
-        fetchDistricts(stateFilter !== 'ALL' ? stateFilter : '')
-      ]);
-      setStates(stList || []);
-      setDistricts(distList || []);
+      if (currentRole !== 'mp') {
+        const [stList, distList] = await Promise.all([
+          fetchStates(),
+          fetchDistricts(stateFilter !== 'ALL' ? stateFilter : '')
+        ]);
+        setStates(stList || []);
+        setDistricts(distList || []);
+      }
     }
     loadMeta();
-  }, [stateFilter]);
+  }, [stateFilter, currentRole]);
 
   useEffect(() => {
     async function loadProjectsData() {
@@ -52,10 +55,14 @@ export default function WorkExplorerView({ currentRole, selectedScope, onSelectP
         limit: pageSize,
         offset: page * pageSize
       };
+      if (currentRole === 'mp') {
+        params.mp_name = selectedScope?.mpName;
+      } else {
+        if (stateFilter !== 'ALL') params.state = stateFilter;
+        if (districtFilter !== 'ALL') params.district = districtFilter;
+      }
       if (searchTerm) params.search = searchTerm;
       if (statusFilter !== 'ALL') params.status = statusFilter;
-      if (stateFilter !== 'ALL') params.state = stateFilter;
-      if (districtFilter !== 'ALL') params.district = districtFilter;
       if (categoryFilter !== 'ALL') params.work_type = categoryFilter;
       if (riskFilter !== 'ALL') params.risk_level = riskFilter;
 
@@ -65,21 +72,9 @@ export default function WorkExplorerView({ currentRole, selectedScope, onSelectP
       setLoading(false);
     }
     loadProjectsData();
-  }, [currentRole, page, pageSize, searchTerm, statusFilter, stateFilter, districtFilter, categoryFilter, riskFilter]);
+  }, [page, pageSize, searchTerm, statusFilter, stateFilter, districtFilter, categoryFilter, riskFilter, currentRole, selectedScope]);
 
   const totalPages = Math.ceil(totalCount / pageSize);
-
-  const workTypes = [
-    { id: 'road', name: 'Roads & Pathways' },
-    { id: 'street_light', name: 'Street Lights / Solar' },
-    { id: 'water_supply', name: 'Water Supply' },
-    { id: 'education', name: 'Education Facilities' },
-    { id: 'community_hall', name: 'Community Halls' },
-    { id: 'drainage', name: 'Drainage Systems' },
-    { id: 'sanitation', name: 'Sanitation' },
-    { id: 'healthcare', name: 'Healthcare' },
-    { id: 'sports', name: 'Sports Infrastructure' }
-  ];
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -88,123 +83,165 @@ export default function WorkExplorerView({ currentRole, selectedScope, onSelectP
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-gov-navy uppercase tracking-wider">
-            <Layers className="w-4 h-4 text-blue-600" />
-            <span>Master Project Monitoring Ledger</span>
+            {currentRole === 'mp' ? <UserCheck className="w-4 h-4 text-purple-600" /> : <Layers className="w-4 h-4 text-blue-600" />}
+            <span>
+              {currentRole === 'mp' 
+                ? `Constituency Project Ledger • ${selectedScope?.mpName || 'MP Works'}`
+                : 'National Scheme Works Ledger'}
+            </span>
           </div>
-          <h2 className="text-xl font-black text-slate-900 mt-1">MPLADS Project Directory & Verification</h2>
+          <h2 className="text-xl font-black text-slate-900 mt-1">
+            {currentRole === 'mp' ? `${selectedScope?.mpName || 'MP'} Sanctioned Works` : 'All MPLADS Works & Anomaly Audit'}
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Query across <strong className="text-slate-900 font-bold">43,496 completed works</strong> with multi-attribute filtering & AI risk annotations
+            {currentRole === 'mp'
+              ? `Showing all ${totalCount} works recommended and sanctioned for ${selectedScope?.mpName}`
+              : `Comprehensive registry of ${totalCount.toLocaleString()} works with explainable AI risk assessments`}
           </p>
         </div>
 
-        <div className="text-xs font-bold px-3.5 py-1.5 rounded-xl bg-blue-50 text-blue-900 border border-blue-200 shrink-0">
-          Total Matching: {totalCount.toLocaleString()} Projects
+        <div className="text-right">
+          <div className="text-2xl font-black text-gov-navy">{totalCount.toLocaleString()}</div>
+          <div className="text-[11px] text-slate-400 font-bold uppercase">Total Works Scoped</div>
         </div>
       </div>
 
-      {/* Filter Controls */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+      {/* Filter Bar */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
           
-          {/* Search bar */}
-          <div className="lg:col-span-2 relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search ID, name, MP, district, agency..."
+              placeholder="Search work name, ID, contractor..."
               value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
-              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50 font-medium"
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(0);
+              }}
+              className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
             />
           </div>
 
-          {/* Status */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-              className="w-full px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="Completed">Completed</option>
-              <option value="Delayed">Delayed</option>
-            </select>
-          </div>
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="Completed">Completed (100% Progress)</option>
+            <option value="Ongoing">Ongoing</option>
+            <option value="Delayed">Delayed</option>
+          </select>
 
-          {/* State */}
-          <div>
-            <select
-              value={stateFilter}
-              onChange={(e) => { setStateFilter(e.target.value); setDistrictFilter('ALL'); setPage(0); }}
-              className="w-full px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-            >
-              <option value="ALL">All States ({states.length})</option>
-              {states.map((s, idx) => (
-                <option key={idx} value={s.state}>{s.state}</option>
-              ))}
-            </select>
-          </div>
+          {/* Category Filter */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setPage(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700"
+          >
+            <option value="ALL">All Work Types</option>
+            <option value="road">Roads & Pathways</option>
+            <option value="street_light">Street Lights</option>
+            <option value="water_supply">Drinking Water</option>
+            <option value="education">Education Facilities</option>
+            <option value="community_hall">Community Halls</option>
+            <option value="drainage">Drainage & Sanitation</option>
+          </select>
 
-          {/* Category */}
-          <div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}
-              className="w-full px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-            >
-              <option value="ALL">All Categories</option>
-              {workTypes.map((w, idx) => (
-                <option key={idx} value={w.id}>{w.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Risk Level Filter */}
+          <select
+            value={riskFilter}
+            onChange={(e) => {
+              setRiskFilter(e.target.value);
+              setPage(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700"
+          >
+            <option value="ALL">All Risk Tiers</option>
+            <option value="CRITICAL">🔴 Critical Risk</option>
+            <option value="HIGH">🟠 High Risk</option>
+            <option value="MEDIUM">🟡 Medium Risk</option>
+            <option value="LOW">🟢 Low Risk (100% Progress)</option>
+          </select>
 
-          {/* Risk Tier */}
-          <div>
-            <select
-              value={riskFilter}
-              onChange={(e) => { setRiskFilter(e.target.value); setPage(0); }}
-              className="w-full px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-            >
-              <option value="ALL">All Risk Tiers</option>
-              <option value="CRITICAL">🔴 Critical (&ge;85)</option>
-              <option value="HIGH">🟠 High (70-84)</option>
-              <option value="MEDIUM">🟡 Medium (40-69)</option>
-              <option value="LOW">🟢 Low (&lt;40)</option>
-            </select>
-          </div>
+          {/* State & District Filters (Hidden for MP role as MP is already strictly scoped) */}
+          {currentRole !== 'mp' && (
+            <>
+              <select
+                value={stateFilter}
+                onChange={(e) => {
+                  setStateFilter(e.target.value);
+                  setDistrictFilter('ALL');
+                  setPage(0);
+                }}
+                className="px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700"
+              >
+                <option value="ALL">All States</option>
+                {states.map((s, idx) => (
+                  <option key={idx} value={s.state}>{s.state}</option>
+                ))}
+              </select>
+
+              {stateFilter !== 'ALL' && (
+                <select
+                  value={districtFilter}
+                  onChange={(e) => {
+                    setDistrictFilter(e.target.value);
+                    setPage(0);
+                  }}
+                  className="px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700"
+                >
+                  <option value="ALL">All Districts</option>
+                  {districts.map((d, idx) => (
+                    <option key={idx} value={d.district}>{d.district}</option>
+                  ))}
+                </select>
+              )}
+            </>
+          )}
 
         </div>
       </div>
 
-      {/* Results Table */}
+      {/* Projects Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
               <tr>
-                <th className="px-6 py-3">Project ID & Work Name</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Location & MP</th>
-                <th className="px-4 py-3 text-right">Sanctioned</th>
-                <th className="px-4 py-3 text-right">Expenditure</th>
-                <th className="px-4 py-3 text-center">Progress</th>
-                <th className="px-4 py-3">Timeline</th>
-                <th className="px-4 py-3 text-center">Risk Level</th>
-                <th className="px-6 py-3 text-center">Action</th>
+                <th className="px-6 py-3.5">Project ID & Name</th>
+                <th className="px-4 py-3.5">Category</th>
+                <th className="px-4 py-3.5">Jurisdiction / MP</th>
+                <th className="px-4 py-3.5 text-right">Sanctioned</th>
+                <th className="px-4 py-3.5 text-right">Expenditure</th>
+                <th className="px-4 py-3.5 text-center">Progress</th>
+                <th className="px-4 py-3.5 text-center">Risk Tier</th>
+                <th className="px-6 py-3.5">Primary Factor</th>
+                <th className="px-4 py-3.5 text-center">Audit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
               {loading ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gov-navy mx-auto"></div>
+                  <td colSpan={9} className="text-center py-12 text-slate-400">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gov-navy mx-auto mb-2"></div>
+                    <span>Querying projects...</span>
                   </td>
                 </tr>
               ) : projects.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-12 text-slate-500">
-                    No matching projects found.
+                  <td colSpan={9} className="text-center py-12 text-slate-400">
+                    No projects found matching the active search and filter criteria.
                   </td>
                 </tr>
               ) : (
@@ -212,34 +249,41 @@ export default function WorkExplorerView({ currentRole, selectedScope, onSelectP
                   <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
                     <td className="px-6 py-3.5 max-w-xs">
                       <div className="font-mono font-bold text-slate-900">#{p.project_id}</div>
-                      <div className="line-clamp-1 text-slate-800 font-semibold">{p.project_name}</div>
+                      <div className="line-clamp-1 font-semibold text-slate-700">{p.project_name}</div>
                     </td>
-                    <td className="px-4 py-3.5 capitalize text-slate-600 whitespace-nowrap">{p.work_type}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="font-bold text-slate-900">{p.district}, {p.state}</div>
-                      <div className="text-[10px] text-slate-500">{p.mp_name}</div>
+                    <td className="px-4 py-3.5 capitalize font-semibold text-slate-600 whitespace-nowrap">
+                      {p.work_type}
                     </td>
-                    <td className="px-4 py-3.5 text-right font-bold text-slate-900">{formatINR(p.sanctioned_amount)}</td>
-                    <td className="px-4 py-3.5 text-right font-black text-slate-900">{formatINR(p.expenditure)}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">
+                      <div>{p.district}, {p.state}</div>
+                      <div className="text-[10px] text-slate-400">{p.mp_name}</div>
+                    </td>
+                    <td className="px-4 py-3.5 text-right font-bold text-slate-700">
+                      {formatINR(p.sanctioned_amount)}
+                    </td>
+                    <td className="px-4 py-3.5 text-right font-black text-slate-900">
+                      {formatINR(p.expenditure)}
+                    </td>
                     <td className="px-4 py-3.5 text-center">
-                      <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{p.progress_pct}%</span>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-500 text-[11px]">
-                      <div>Start: {p.start_date || 'N/A'}</div>
-                      <div className={p.is_delayed ? 'text-red-600 font-bold' : ''}>
-                        Target: {p.expected_completion_date || 'N/A'}
-                      </div>
+                      <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        {p.progress_pct}%
+                      </span>
                     </td>
                     <td className="px-4 py-3.5 text-center whitespace-nowrap">
                       <RiskBadge score={p.risk_score} category={p.risk_level} />
                     </td>
-                    <td className="px-6 py-3.5 text-center">
+                    <td className="px-6 py-3.5 text-[11px] max-w-xs">
+                      <span className={p.risk_level === 'LOW' ? 'text-emerald-700 font-bold' : 'text-red-700 font-semibold'}>
+                        {p.risk_factors?.[0] || '100% physically completed on schedule'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
                       <button
                         onClick={() => onSelectProject(p)}
                         className="px-3 py-1 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 mx-auto shadow-2xs"
                       >
                         <Eye className="w-3.5 h-3.5 text-amber-400" />
-                        <span>View Details</span>
+                        <span>Inspect</span>
                       </button>
                     </td>
                   </tr>
@@ -250,29 +294,33 @@ export default function WorkExplorerView({ currentRole, selectedScope, onSelectP
         </div>
 
         {/* Pagination Bar */}
-        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <span className="text-slate-500">
-            Showing Page <strong className="text-slate-900">{page + 1}</strong> of <strong className="text-slate-900">{totalPages || 1}</strong> ({totalCount.toLocaleString()} total projects)
-          </span>
+        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+          <div>
+            Showing <strong className="text-slate-900">{page * pageSize + 1}</strong> to{' '}
+            <strong className="text-slate-900">{Math.min((page + 1) * pageSize, totalCount)}</strong> of{' '}
+            <strong className="text-slate-900">{totalCount.toLocaleString()}</strong> works
+          </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage(Math.max(0, page - 1))}
               disabled={page === 0}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-semibold flex items-center gap-1"
+              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="w-4 h-4" /> Previous
+              <ChevronLeft className="w-4 h-4" />
             </button>
+            <span className="font-bold text-slate-800">
+              Page {page + 1} of {Math.max(1, totalPages)}
+            </span>
             <button
               onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
               disabled={page >= totalPages - 1}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 font-semibold flex items-center gap-1"
+              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Next <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>
-
       </div>
 
     </div>

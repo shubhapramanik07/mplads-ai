@@ -1,6 +1,6 @@
 """
 FastAPI Backend API for MPLADS AI Anomaly, Fraud & Inefficiency Detection.
-Provides resilient, role-based dashboard APIs for Ministry, State Nodal, District Authority, and MP roles.
+Provides strict role-based data scoping for Ministry, State Nodal, District Authority, and MP roles.
 """
 import json
 import os
@@ -75,8 +75,8 @@ def _clean_record(row_dict: dict) -> dict:
     if prog >= 100.0:
         cleaned["risk_level"] = "LOW"
         cleaned["risk_category"] = "LOW"
-        if cleaned.get("risk_score", 0) > 30.0:
-            cleaned["risk_score"] = 20.0
+        if cleaned.get("risk_score", 0) > 25.0:
+            cleaned["risk_score"] = 15.0
     elif "risk_level" not in cleaned:
         s = float(cleaned.get("risk_score", 0) or 0)
         cleaned["risk_level"] = "CRITICAL" if s >= 80 else "HIGH" if s >= 60 else "MEDIUM" if s >= 35 else "LOW"
@@ -85,17 +85,26 @@ def _clean_record(row_dict: dict) -> dict:
 
 def _filter_by_role(df: pd.DataFrame, role: str, state: Optional[str] = None, district: Optional[str] = None, mp_name: Optional[str] = None) -> pd.DataFrame:
     """
-    Robust role-based filtering that guarantees data is found and never returns empty due to casing/whitespace mismatches.
+    Robust role-based filtering that guarantees data is scoped strictly to the selected authority.
     """
     role = (role or "ministry").strip().lower()
     df_result = df.copy()
 
-    # 1. MP Scope
-    if role == "mp" and mp_name and mp_name.strip().lower() != "all":
-        mpc = mp_name.strip().lower()
-        match = df_result[df_result["mp_name"].astype(str).str.strip().str.lower().str.contains(mpc, na=False)]
-        if not match.empty:
-            return match
+    # 1. MP Scope (Match by MP Name or Constituency e.g. Balurghat)
+    if role == "mp":
+        if mp_name and mp_name.strip().lower() not in ["all", ""]:
+            mpc = mp_name.strip().lower()
+            match = df_result[
+                df_result["mp_name"].astype(str).str.strip().str.lower().str.contains(mpc, na=False) |
+                df_result["constituency"].astype(str).str.strip().str.lower().str.contains(mpc, na=False)
+            ]
+            if not match.empty:
+                return match
+        # Fallback: if mp_name wasn't passed or found, try state if provided
+        if state and state.strip().lower() not in ["all", "national", ""]:
+            st_match = df_result[df_result["state"].astype(str).str.strip().str.lower() == state.strip().lower()]
+            if not st_match.empty:
+                return st_match
 
     # 2. District Scope
     if role == "district":
@@ -108,22 +117,21 @@ def _filter_by_role(df: pd.DataFrame, role: str, state: Optional[str] = None, di
             if not dist_match.empty:
                 return dist_match
         
-        # If district is All or not found, filter by state if valid
-        if state and state.strip().lower() not in ["all", ""]:
+        if state and state.strip().lower() not in ["all", "national", ""]:
             st_c = state.strip().lower()
             st_match = df_result[df_result["state"].astype(str).str.strip().str.lower() == st_c]
             if not st_match.empty:
                 return st_match
 
     # 3. State Scope
-    if role == "state" and state and state.strip().lower() not in ["all", ""]:
+    if role == "state" and state and state.strip().lower() not in ["all", "national", ""]:
         st_c = state.strip().lower()
         st_match = df_result[df_result["state"].astype(str).str.strip().str.lower() == st_c]
         if not st_match.empty:
             return st_match
 
-    # 4. Secondary filters (Ministry or generic fallback)
-    if state and state.strip().lower() not in ["all", ""]:
+    # 4. Secondary filters (Ministry or generic query)
+    if state and state.strip().lower() not in ["all", "national", ""]:
         st_c = state.strip().lower()
         st_sub = df_result[df_result["state"].astype(str).str.strip().str.lower() == st_c]
         if not st_sub.empty:
@@ -140,7 +148,10 @@ def _filter_by_role(df: pd.DataFrame, role: str, state: Optional[str] = None, di
 
     if mp_name and mp_name.strip().lower() not in ["all", ""]:
         mpc = mp_name.strip().lower()
-        mp_sub = df_result[df_result["mp_name"].astype(str).str.strip().str.lower().str.contains(mpc, na=False)]
+        mp_sub = df_result[
+            df_result["mp_name"].astype(str).str.strip().str.lower().str.contains(mpc, na=False) |
+            df_result["constituency"].astype(str).str.strip().str.lower().str.contains(mpc, na=False)
+        ]
         if not mp_sub.empty:
             df_result = mp_sub
 
@@ -423,7 +434,7 @@ def get_api_states():
 def get_api_districts(state: Optional[str] = None):
     """Returns district comparison list within a state or nationally."""
     df = get_risk_scored_data()
-    if state and state.strip().lower() not in ["all", ""]:
+    if state and state.strip().lower() not in ["all", "national", ""]:
         df_sub = df[df["state"].astype(str).str.strip().str.lower() == state.strip().lower()]
         if not df_sub.empty:
             df = df_sub
@@ -484,7 +495,7 @@ def get_api_analytics(
     low_cnt = int((df_scoped["risk_level"] == "LOW").sum())
 
     risk_dist = [
-        {"name": "Low Risk (🟢 Clean / 100% Progress)", "count": low_cnt, "color": "#16A34A"},
+        {"name": "Low Risk (🟢 100% Progress / Clean)", "count": low_cnt, "color": "#16A34A"},
         {"name": "Medium Risk (🟡 Review)", "count": med_cnt, "color": "#F59E0B"},
         {"name": "High Risk (🟠 Priority Audit)", "count": high_cnt, "color": "#EA580C"},
         {"name": "Critical Risk (🔴 Urgent Investigation)", "count": critical_cnt, "color": "#DC2626"}
@@ -510,14 +521,16 @@ def get_api_analytics(
 
 @app.get("/api/map/projects")
 def get_map_projects(
+    role: str = Query("ministry"),
     state: Optional[str] = Query(None),
     district: Optional[str] = Query(None),
+    mp_name: Optional[str] = Query(None),
     risk_level: Optional[str] = Query(None),
     limit: int = Query(300, ge=1, le=1000)
 ):
     """Returns geospatial coordinate markers for interactive map visualization."""
     df = get_risk_scored_data()
-    df_filtered = _filter_by_role(df, "ministry", state, district, None)
+    df_filtered = _filter_by_role(df, role, state, district, mp_name)
 
     if risk_level and risk_level.upper() != "ALL":
         df_filtered = df_filtered[df_filtered["risk_level"].astype(str).str.upper() == risk_level.strip().upper()]
@@ -630,9 +643,10 @@ def get_mp_summary_compat(state: Optional[str] = None):
 def get_benchmarks_compat(mp_name: str, state: Optional[str] = None):
     df = get_risk_scored_data()
     mp_clean = mp_name.strip().lower()
-    df_mp = df[df["mp_name"].str.strip().str.lower() == mp_clean]
-    if df_mp.empty:
-        df_mp = df[df["mp_name"].str.strip().str.lower().str.contains(mp_clean, na=False)]
+    df_mp = df[
+        df["mp_name"].str.strip().str.lower().str.contains(mp_clean, na=False) |
+        df["constituency"].str.strip().str.lower().str.contains(mp_clean, na=False)
+    ]
 
     mp_state = state if state else (df_mp["state"].iloc[0] if not df_mp.empty else "National")
     df_state = df[df["state"].str.strip().str.lower() == str(mp_state).strip().lower()]
@@ -725,19 +739,4 @@ def get_alerts_compat(
         "threshold": min_risk_score,
         "returned": res["returned"],
         "alerts": res["alerts"]
-    }
-
-@app.get("/validation/report")
-def get_validation():
-    return get_validation_report()
-
-@app.post("/recalculate")
-def recalculate_risk_scores():
-    engine = MPLADSRiskEngine()
-    df_res = engine.evaluate_all_risks()
-    return {
-        "status": "success",
-        "message": f"Successfully re-evaluated risk models on {len(df_res)} records.",
-        "high_risk_count": int((df_res["risk_level"].isin(["HIGH", "CRITICAL"])).sum()),
-        "avg_risk_score": round(float(df_res["risk_score"].mean()), 2)
     }

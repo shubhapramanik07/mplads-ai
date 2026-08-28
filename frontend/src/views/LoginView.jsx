@@ -11,14 +11,16 @@ import {
   AlertCircle,
   KeyRound,
   Eye,
-  EyeOff
+  EyeOff,
+  Search
 } from 'lucide-react';
 
 export default function LoginView({ onLogin, states = [], mps = [] }) {
   const [selectedRole, setSelectedRole] = useState('ministry'); // ministry, state, district, mp
   const [selectedState, setSelectedState] = useState('Uttar Pradesh');
   const [selectedDistrict, setSelectedDistrict] = useState('Varanasi');
-  const [selectedMP, setSelectedMP] = useState('');
+  const [selectedMP, setSelectedMP] = useState('Dr Sukanta Majumdar');
+  const [mpSearch, setMpSearch] = useState('');
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -75,9 +77,19 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
       setSelectedState('Uttar Pradesh');
       setSelectedDistrict('Varanasi');
     } else if (roleId === 'mp') {
-      setSelectedMP(mps[0]?.mp_name || 'Arun Bharti');
+      setSelectedMP('Dr Sukanta Majumdar'); // Default to Balurghat MP
     }
   };
+
+  const filteredMps = mps.filter(m => {
+    if (!mpSearch) return true;
+    const s = mpSearch.toLowerCase();
+    return (
+      (m.mp_name && m.mp_name.toLowerCase().includes(s)) ||
+      (m.constituency && m.constituency.toLowerCase().includes(s)) ||
+      (m.state && m.state.toLowerCase().includes(s))
+    );
+  });
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
@@ -86,26 +98,32 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
     const cleanUser = userId.trim();
     const cleanPass = password.trim();
 
-    // Verification check: accept 12345 / sih or admin credentials
     if (!cleanUser || !cleanPass) {
       setErrorMsg('Please enter both User ID and Password.');
       return;
     }
 
     if (cleanUser === '12345' && cleanPass.toLowerCase() === 'sih') {
+      const activeMpObj = mps.find(m => m.mp_name === selectedMP) || {
+        mp_name: selectedMP || 'Dr Sukanta Majumdar',
+        constituency: 'Balurghat',
+        state: 'West Bengal'
+      };
+
       onLogin({
         role: selectedRole,
         scope: {
-          state: selectedRole === 'ministry' ? 'National' : selectedState,
-          district: selectedRole === 'district' ? selectedDistrict : 'All',
-          mpName: selectedRole === 'mp' ? (selectedMP || mps[0]?.mp_name || 'Arun Bharti') : 'All'
+          state: selectedRole === 'ministry' ? 'National' : selectedRole === 'mp' ? activeMpObj.state : selectedState,
+          district: selectedRole === 'district' ? selectedDistrict : selectedRole === 'mp' ? activeMpObj.constituency : 'All',
+          mpName: selectedRole === 'mp' ? activeMpObj.mp_name : 'All',
+          constituency: selectedRole === 'mp' ? activeMpObj.constituency : 'All'
         },
         user: {
           id: cleanUser,
           name: selectedRole === 'ministry' ? 'Joint Secretary (MoSPI)' :
                 selectedRole === 'state' ? `Nodal Officer (${selectedState})` :
                 selectedRole === 'district' ? `District Magistrate (${selectedDistrict})` :
-                `Hon. MP (${selectedMP || 'Constituency'})`,
+                `Hon. MP (${activeMpObj.mp_name} — ${activeMpObj.constituency})`,
           roleTitle: roles.find(r => r.id === selectedRole)?.title
         }
       });
@@ -144,15 +162,15 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
               <div className="space-y-2 pt-3 text-xs border-t border-white/10">
                 <div className="flex items-center gap-2 text-blue-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Role-Based Access Control (RBAC)</span>
+                  <span>Strict Authority Scope Isolation</span>
                 </div>
                 <div className="flex items-center gap-2 text-blue-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Explainable AI Multi-Factor Risk Engine</span>
+                  <span>Dedicated Constituency & District Portals</span>
                 </div>
                 <div className="flex items-center gap-2 text-blue-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>National to Project-Level Audit Drill-Down</span>
+                  <span>100% Progress Works Verified Low Risk</span>
                 </div>
               </div>
             </div>
@@ -176,7 +194,7 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
               <div>
                 <span className="text-[10px] font-extrabold text-gov-saffron uppercase tracking-wider">OFFICIAL ACCESS GATEWAY</span>
                 <h3 className="text-lg font-black text-slate-900 mt-0.5">Select Authority Role to Proceed</h3>
-                <p className="text-xs text-slate-500">Each role provides customized monitoring dashboards and restricted authority scope</p>
+                <p className="text-xs text-slate-500">Each role isolates and displays only the authorized projects and jurisdiction</p>
               </div>
 
               {/* Step 1: Role Selection Grid */}
@@ -256,14 +274,31 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
               )}
 
               {selectedRole === 'mp' && (
-                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-1.5 animate-fadeIn">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Select Member of Parliament (MP):</label>
+                <div className="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200 space-y-2 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-extrabold text-purple-900 uppercase">Select Member of Parliament (MP):</label>
+                    <span className="text-[10px] text-purple-700 font-bold">Constituency Scope</span>
+                  </div>
+
+                  {/* Search Filter for MP */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search MP name or Constituency (e.g. Balurghat)..."
+                      value={mpSearch}
+                      onChange={(e) => setMpSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs border border-purple-300 rounded-lg bg-white font-medium"
+                    />
+                  </div>
+
                   <select
-                    value={selectedMP || (mps[0]?.mp_name || '')}
+                    value={selectedMP}
                     onChange={(e) => setSelectedMP(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold bg-white border border-slate-300 rounded-xl text-slate-900"
+                    className="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-300 rounded-xl text-slate-900"
                   >
-                    {mps.map((m, idx) => (
+                    <option value="Dr Sukanta Majumdar">⭐ Dr Sukanta Majumdar — Balurghat (West Bengal)</option>
+                    {filteredMps.filter(m => m.mp_name !== 'Dr Sukanta Majumdar').map((m, idx) => (
                       <option key={idx} value={m.mp_name}>
                         {m.mp_name} — {m.constituency} ({m.state})
                       </option>

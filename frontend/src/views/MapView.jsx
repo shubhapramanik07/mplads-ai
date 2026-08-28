@@ -7,12 +7,13 @@ import {
   Building2, 
   Eye, 
   AlertTriangle,
-  Info
+  Info,
+  UserCheck
 } from 'lucide-react';
 import RiskBadge from '../components/RiskBadge';
 import { fetchMapProjects, fetchStates, fetchDistricts, formatINR } from '../services/api';
 
-export default function MapView({ selectedScope, onSelectProject }) {
+export default function MapView({ currentRole = 'ministry', selectedScope, onSelectProject }) {
   const [markers, setMarkers] = useState([]);
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -24,24 +25,28 @@ export default function MapView({ selectedScope, onSelectProject }) {
 
   useEffect(() => {
     async function loadMeta() {
-      const [stList, distList] = await Promise.all([
-        fetchStates(),
-        fetchDistricts(stateFilter !== 'ALL' ? stateFilter : '')
-      ]);
-      setStates(stList || []);
-      setDistricts(distList || []);
+      if (currentRole !== 'mp') {
+        const [stList, distList] = await Promise.all([
+          fetchStates(),
+          fetchDistricts(stateFilter !== 'ALL' ? stateFilter : '')
+        ]);
+        setStates(stList || []);
+        setDistricts(distList || []);
+      }
     }
     loadMeta();
-  }, [stateFilter]);
+  }, [stateFilter, currentRole]);
 
   useEffect(() => {
     async function loadMapData() {
       setLoading(true);
       const res = await fetchMapProjects({
-        state: stateFilter !== 'ALL' ? stateFilter : undefined,
-        district: districtFilter !== 'ALL' ? districtFilter : undefined,
+        role: currentRole,
+        state: currentRole === 'mp' ? undefined : (stateFilter !== 'ALL' ? stateFilter : undefined),
+        district: currentRole === 'mp' ? undefined : (districtFilter !== 'ALL' ? districtFilter : undefined),
+        mp_name: currentRole === 'mp' ? selectedScope?.mpName : undefined,
         risk_level: riskFilter !== 'ALL' ? riskFilter : undefined,
-        limit: 250
+        limit: 350
       });
       setMarkers(res?.markers || []);
       if (res?.markers && res.markers.length > 0) {
@@ -50,7 +55,7 @@ export default function MapView({ selectedScope, onSelectProject }) {
       setLoading(false);
     }
     loadMapData();
-  }, [stateFilter, districtFilter, riskFilter]);
+  }, [stateFilter, districtFilter, riskFilter, currentRole, selectedScope]);
 
   const getPinColor = (riskLevel) => {
     switch (riskLevel) {
@@ -68,196 +73,207 @@ export default function MapView({ selectedScope, onSelectProject }) {
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-gov-navy uppercase tracking-wider">
-            <MapPin className="w-4 h-4 text-blue-600" />
-            <span>Geospatial Intelligence & Asset Verification Map</span>
+            {currentRole === 'mp' ? <UserCheck className="w-4 h-4 text-purple-600" /> : <MapPin className="w-4 h-4 text-red-600" />}
+            <span>
+              {currentRole === 'mp' 
+                ? `Constituency Geo-Map • ${selectedScope?.mpName || 'MP Works'}`
+                : 'National GIS Geospatial Intelligence Module'}
+            </span>
           </div>
-          <h2 className="text-xl font-black text-slate-900 mt-1">MPLADS Project Location Map</h2>
+          <h2 className="text-xl font-black text-slate-900 mt-1">
+            {currentRole === 'mp' ? `${selectedScope?.mpName || 'MP'} Work Site Coordinates` : 'Interactive Geo-Risk Location Map'}
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Geographic distribution of <strong className="text-slate-900 font-bold">{markers.length} mapped projects</strong> color-coded by AI risk level
+            {currentRole === 'mp' 
+              ? `Displaying all ${markers.length} sanctioned scheme works for ${selectedScope?.mpName || 'this MP'}`
+              : `Spatial distribution of ${markers.length} active and completed MPLADS works with risk clustering`}
           </p>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">🟢 Low (&lt;40)</span>
-          <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">🟡 Medium (40-69)</span>
-          <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded bg-orange-50 text-orange-800 border border-orange-200">🟠 High (70-84)</span>
-          <span className="inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded bg-red-50 text-red-800 border border-red-200">🔴 Critical (&ge;85)</span>
-        </div>
-      </div>
+        {/* Filter Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {currentRole !== 'mp' && (
+            <>
+              <select
+                value={stateFilter}
+                onChange={(e) => {
+                  setStateFilter(e.target.value);
+                  setDistrictFilter('ALL');
+                }}
+                className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
+              >
+                <option value="ALL">All States</option>
+                {states.map((s, idx) => (
+                  <option key={idx} value={s.state}>{s.state}</option>
+                ))}
+              </select>
 
-      {/* Filter Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className="text-[11px] font-bold text-slate-500 uppercase">State / UT:</label>
-          <select
-            value={stateFilter}
-            onChange={(e) => { setStateFilter(e.target.value); setDistrictFilter('ALL'); }}
-            className="w-full mt-1 px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-          >
-            <option value="ALL">All States / UTs</option>
-            {states.map((s, idx) => (
-              <option key={idx} value={s.state}>{s.state}</option>
-            ))}
-          </select>
-        </div>
+              {stateFilter !== 'ALL' && (
+                <select
+                  value={districtFilter}
+                  onChange={(e) => setDistrictFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
+                >
+                  <option value="ALL">All Districts</option>
+                  {districts.map((d, idx) => (
+                    <option key={idx} value={d.district}>{d.district}</option>
+                  ))}
+                </select>
+              )}
+            </>
+          )}
 
-        <div>
-          <label className="text-[11px] font-bold text-slate-500 uppercase">District:</label>
-          <select
-            value={districtFilter}
-            onChange={(e) => setDistrictFilter(e.target.value)}
-            className="w-full mt-1 px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
-          >
-            <option value="ALL">All Districts</option>
-            {districts.map((d, idx) => (
-              <option key={idx} value={d.district}>{d.district}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-bold text-slate-500 uppercase">Risk Level:</label>
           <select
             value={riskFilter}
             onChange={(e) => setRiskFilter(e.target.value)}
-            className="w-full mt-1 px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
+            className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
           >
-            <option value="ALL">All Risk Tiers</option>
-            <option value="CRITICAL">🔴 Critical (&ge;85)</option>
-            <option value="HIGH">🟠 High (70-84)</option>
-            <option value="MEDIUM">🟡 Medium (40-69)</option>
-            <option value="LOW">🟢 Low (&lt;40)</option>
+            <option value="ALL">All Risk Levels</option>
+            <option value="CRITICAL">🔴 Critical Risk</option>
+            <option value="HIGH">🟠 High Risk</option>
+            <option value="MEDIUM">🟡 Medium Risk</option>
+            <option value="LOW">🟢 Low Risk (100% Progress)</option>
           </select>
         </div>
       </div>
 
-      {/* Map Layout Grid: Map Viewport + Active Marker Inspector */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Map + Detail Panel Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Interactive Simulated Map Canvas */}
-        <div className="lg:col-span-2 bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-lg min-h-[480px] relative overflow-hidden flex flex-col justify-between">
+        {/* Interactive Map Visualizer */}
+        <div className="lg:col-span-8 bg-slate-900 rounded-2xl p-4 shadow-md border border-slate-800 flex flex-col justify-between min-h-[500px] relative overflow-hidden">
           
-          {/* Top Overlay */}
-          <div className="flex items-center justify-between z-10">
-            <span className="text-xs font-bold text-slate-300 bg-slate-800/80 px-3 py-1 rounded-lg backdrop-blur-xs border border-slate-700">
-              India Geospatial Coordinate Grid (Active Coordinates: {markers.length})
+          {/* Map Top Overlay */}
+          <div className="absolute top-4 left-4 z-10 flex flex-wrap gap-2 text-xs">
+            <span className="px-3 py-1 bg-slate-800/90 text-white rounded-lg border border-slate-700 font-semibold backdrop-blur-xs">
+              📍 {markers.length} Pins Visualized
             </span>
-            <span className="text-[11px] text-amber-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-lg backdrop-blur-xs">
-              Click pin to inspect project
-            </span>
+            <div className="flex items-center gap-2 bg-slate-800/90 px-3 py-1 rounded-lg border border-slate-700 text-[11px] text-slate-300 backdrop-blur-xs">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Low</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Med</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span> High</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-600"></span> Critical</span>
+            </div>
           </div>
 
-          {/* Interactive Geographic Marker Grid Canvas */}
-          <div className="relative w-full h-96 my-4 bg-slate-950/60 rounded-xl border border-slate-800/80 p-4 overflow-hidden">
-            {/* India Background Grid Lines */}
-            <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40"></div>
-            
-            {loading ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
-              </div>
-            ) : markers.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
-                No project coordinates found for selected filters.
-              </div>
-            ) : (
-              <div className="relative w-full h-full">
-                {markers.map((m, idx) => {
-                  // Normalize lat/lon to percentage of canvas
-                  // India approx: Lat 8N to 37N (span 29), Lon 68E to 97E (span 29)
-                  const topPct = Math.max(5, Math.min(92, 100 - ((m.latitude - 8) / 29) * 100));
-                  const leftPct = Math.max(5, Math.min(92, ((m.longitude - 68) / 29) * 100));
-                  const isSelected = selectedMarker?.project_id === m.project_id;
+          {/* Map SVG Grid Canvas */}
+          <div className="w-full h-full flex-1 relative flex items-center justify-center p-8">
+            <svg 
+              viewBox="65 5 35 35" 
+              className="w-full h-[400px] max-h-[450px] opacity-90 transition-all"
+            >
+              {/* Subtle Geo Grid Lines */}
+              <defs>
+                <pattern id="grid" width="2" height="2" patternUnits="userSpaceOnUse">
+                  <path d="M 2 0 L 0 0 0 2" fill="none" stroke="#1E293B" strokeWidth="0.1"/>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)" />
 
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedMarker(m)}
-                      style={{ top: `${topPct}%`, left: `${leftPct}%` }}
-                      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full p-1 transition-all shadow-md ${
-                        getPinColor(m.risk_level)
-                      } ${isSelected ? 'scale-150 ring-4 ring-white z-30' : 'hover:scale-125 z-10 opacity-85'}`}
-                      title={`#${m.project_id} - ${m.project_name} (${m.risk_level})`}
-                    >
-                      <MapPin className="w-3.5 h-3.5" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              {/* Coordinate Markers */}
+              {markers.map((m, idx) => {
+                const isSelected = selectedMarker?.project_id === m.project_id;
+                const pinColor = m.risk_level === 'CRITICAL' ? '#DC2626' :
+                                 m.risk_level === 'HIGH' ? '#EA580C' :
+                                 m.risk_level === 'MEDIUM' ? '#F59E0B' : '#16A34A';
+                
+                // SVG coordinates (Long = X: 68 to 97, Lat = Y: 37 down to 8)
+                const cx = Math.max(68, Math.min(96, m.longitude));
+                const cy = Math.max(8, Math.min(36, 42 - m.latitude));
+
+                return (
+                  <g 
+                    key={idx} 
+                    onClick={() => setSelectedMarker(m)} 
+                    className="cursor-pointer group"
+                  >
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={isSelected ? 1.2 : 0.65}
+                      fill={pinColor}
+                      stroke={isSelected ? '#FFFFFF' : '#0F172A'}
+                      strokeWidth={isSelected ? 0.3 : 0.15}
+                      className="transition-all hover:scale-150"
+                    />
+                    {isSelected && (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={2.0}
+                        fill="none"
+                        stroke={pinColor}
+                        strokeWidth="0.15"
+                        strokeDasharray="0.3 0.3"
+                        className="animate-ping origin-center"
+                      />
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
           </div>
 
-          {/* Bottom Coordinates Footer */}
-          <div className="text-[11px] text-slate-400 flex items-center justify-between z-10">
-            <span>Projection: WGS84 GeoJSON Compatible</span>
-            <span>Target Boundary: All Indian Parliamentary Constituencies</span>
+          <div className="text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-800 pt-3">
+            <span>Spatial Projection: WGS84 Standard Indian Geodetic Datum</span>
+            <span>Click any marker to inspect project forensic data</span>
           </div>
 
         </div>
 
-        {/* Selected Project Card Popup */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+        {/* Selected Project Inspector Card */}
+        <div className="lg:col-span-4 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
           {selectedMarker ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
-                  <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                    #{selectedMarker.project_id}
-                  </span>
-                  <div className="text-xs font-extrabold text-slate-900 mt-1 capitalize">
-                    {selectedMarker.work_type.replace('_', ' ')}
-                  </div>
-                </div>
+                <span className="font-mono text-xs font-bold text-slate-400">#{selectedMarker.project_id}</span>
                 <RiskBadge score={selectedMarker.risk_score} category={selectedMarker.risk_level} />
               </div>
 
-              <div className="space-y-2">
-                <div className="text-xs font-bold text-slate-400 uppercase">Work Description</div>
-                <p className="text-xs font-semibold text-slate-800 leading-relaxed line-clamp-3">
-                  "{selectedMarker.project_name}"
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5 pt-1 text-xs">
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">Expenditure</div>
-                  <div className="text-sm font-black text-slate-900 mt-0.5">{formatINR(selectedMarker.expenditure)}</div>
-                </div>
-
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">Progress</div>
-                  <div className="text-sm font-black text-emerald-700 mt-0.5">{selectedMarker.progress_pct}%</div>
-                </div>
-
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">Location</div>
-                  <div className="text-xs font-bold text-slate-800 mt-0.5 truncate">{selectedMarker.district}, {selectedMarker.state}</div>
-                </div>
-
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">Coordinates</div>
-                  <div className="text-xs font-mono font-semibold text-slate-600 mt-0.5">
-                    {selectedMarker.latitude.toFixed(2)}°N, {selectedMarker.longitude.toFixed(2)}°E
-                  </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 leading-snug">
+                  {selectedMarker.project_name}
+                </h3>
+                <div className="text-xs text-slate-500 mt-1 capitalize">
+                  Type: <strong>{selectedMarker.work_type}</strong>
                 </div>
               </div>
 
-              <div className="text-xs text-slate-500">
-                <strong>Recommending MP:</strong> {selectedMarker.mp_name}
+              <div className="bg-slate-50 rounded-xl p-3.5 space-y-2 text-xs border border-slate-100">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Location:</span>
+                  <strong className="text-slate-800">{selectedMarker.district}, {selectedMarker.state}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Member of Parliament:</span>
+                  <strong className="text-slate-800">{selectedMarker.mp_name}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Expenditure:</span>
+                  <strong className="text-slate-900 font-extrabold">{formatINR(selectedMarker.expenditure)}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Physical Progress:</span>
+                  <strong className="text-emerald-700 font-bold">{selectedMarker.progress_pct}% Completed</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Geo-Coordinates:</span>
+                  <strong className="text-slate-700 font-mono">{selectedMarker.latitude?.toFixed(4)}° N, {selectedMarker.longitude?.toFixed(4)}° E</strong>
+                </div>
               </div>
 
               <button
                 onClick={() => onSelectProject(selectedMarker)}
-                className="w-full py-2.5 bg-gov-navy hover:bg-slate-800 text-white text-xs font-extrabold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-gov-navy hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-2xs flex items-center justify-center gap-2"
               >
-                <Eye className="w-4 h-4 text-amber-400" />
-                <span>View Full Project Dossier</span>
+                <Eye className="w-3.5 h-3.5 text-amber-400" />
+                <span>Open 5-Step Vigilance Audit</span>
               </button>
             </div>
           ) : (
-            <div className="text-center py-16 text-slate-400 text-xs">
-              Select any map pin to inspect project parameters.
+            <div className="flex flex-col items-center justify-center h-full text-center py-12 text-slate-400">
+              <Info className="w-8 h-8 mb-2 stroke-1" />
+              <p className="text-xs">Click on any marker on the map to view detailed geo-tagged project analytics.</p>
             </div>
           )}
         </div>

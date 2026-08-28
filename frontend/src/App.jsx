@@ -8,7 +8,6 @@ import AlertsView from './views/AlertsView';
 import AnalyticsView from './views/AnalyticsView';
 import MapView from './views/MapView';
 import ReportsView from './views/ReportsView';
-import ValidationLabView from './views/ValidationLabView';
 import { fetchStates, fetchDistricts, fetchMPSummaries, fetchApiAlerts } from './services/api';
 import { ExternalLink } from 'lucide-react';
 
@@ -28,7 +27,7 @@ export default function App() {
 
   const [selectedScope, setSelectedScope] = useState(() => {
     const saved = sessionStorage.getItem('mplads_scope');
-    return saved ? JSON.parse(saved) : { state: 'Uttar Pradesh', district: 'All', mpName: '' };
+    return saved ? JSON.parse(saved) : { state: 'Uttar Pradesh', district: 'All', mpName: 'Dr Sukanta Majumdar' };
   });
 
   const [activeNav, setActiveNav] = useState('dashboard');
@@ -50,7 +49,7 @@ export default function App() {
       setAlertCount(alertsRes?.total_alerts || 0);
 
       if (mpList && mpList.length > 0 && !selectedScope.mpName) {
-        setSelectedScope(prev => ({ ...prev, mpName: mpList[0].mp_name }));
+        setSelectedScope(prev => ({ ...prev, mpName: 'Dr Sukanta Majumdar' }));
       }
     }
     loadInitialMetadata();
@@ -171,6 +170,7 @@ export default function App() {
 
         {activeNav === 'map' && (
           <MapView 
+            currentRole={currentRole}
             selectedScope={selectedScope}
             onSelectProject={(p) => setInspectedProject(p)}
           />
@@ -181,10 +181,6 @@ export default function App() {
             currentRole={currentRole}
             selectedScope={selectedScope}
           />
-        )}
-
-        {activeNav === 'validation' && (
-          <ValidationLabView />
         )}
       </main>
 

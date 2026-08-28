@@ -7,7 +7,6 @@ import {
   LineChart, 
   MapPin, 
   FileSpreadsheet, 
-  FlaskConical,
   Search,
   Bell,
   User,
@@ -44,6 +43,7 @@ export default function Navbar({
     { id: 'mp', label: 'Member of Parliament', subtitle: 'Constituency Work Monitoring', icon: UserCheck, color: 'bg-purple-600' },
   ];
 
+  // AI Model Lab has been completely removed as requested
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'projects', label: 'Projects', icon: FolderGit2 },
@@ -51,7 +51,6 @@ export default function Navbar({
     { id: 'analytics', label: 'Analytics', icon: LineChart },
     { id: 'map', label: 'Project Map', icon: MapPin },
     { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
-    { id: 'validation', label: 'AI Model Lab', icon: FlaskConical },
   ];
 
   const handleSearchSubmit = (e) => {
@@ -191,7 +190,7 @@ export default function Navbar({
 
       </div>
 
-      {/* Role Context Bar (State/District/MP Specific Selectors) */}
+      {/* Role Context Bar */}
       <div className="bg-slate-100 border-t border-slate-200 px-4 sm:px-6 lg:px-8 py-1.5 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 font-semibold text-slate-700">
           <span className="text-slate-400">Authority Scope:</span>
@@ -249,14 +248,19 @@ export default function Navbar({
           )}
 
           {currentRole === 'mp' && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500">Member of Parliament:</span>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 bg-purple-100 text-purple-900 rounded-md font-extrabold flex items-center gap-1.5">
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Constituency Portfolio: {selectedScope.mpName || 'Dr Sukanta Majumdar'}</span>
+              </span>
+
               <select
-                value={selectedScope.mpName || (mps[0]?.mp_name || '')}
+                value={selectedScope.mpName || 'Dr Sukanta Majumdar'}
                 onChange={(e) => setSelectedScope({ ...selectedScope, mpName: e.target.value })}
                 className="font-bold bg-white border border-slate-300 rounded px-2 py-0.5 text-slate-900 max-w-xs truncate"
               >
-                {mps.map((m, idx) => (
+                <option value="Dr Sukanta Majumdar">Dr Sukanta Majumdar — Balurghat (West Bengal)</option>
+                {mps.filter(m => m.mp_name !== 'Dr Sukanta Majumdar').map((m, idx) => (
                   <option key={idx} value={m.mp_name}>
                     {m.mp_name} — {m.constituency} ({m.state})
                   </option>
