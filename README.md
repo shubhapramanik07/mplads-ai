@@ -1,98 +1,148 @@
-# 🛡️ AI-Powered MPLADS Anomaly & Fraud Detection System
-
-**Smart India Hackathon (SIH) Problem Statement:** SIH26102  
-**Domain:** Ministry of Statistics and Programme Implementation (MoSPI) / Government Schemes  
-**Tech Stack:** Python 3.12, FastAPI (REST API & Analytics Engine), Scikit-Learn (Isolation Forest & NLP), Streamlit (Interactive Multi-Role Dashboard), Plotly (Visualizations).
+# 🏛️ MPLADS AI Vigilance & Monitoring Platform
+### Intelligent Decision Support & Multi-Factor Anomaly Detection System
+**Ministry of Statistics and Programme Implementation (MoSPI) • Government of India**
 
 ---
 
-## 🎯 Executive Summary & Judge Pitch
+## 📌 Executive Overview
 
-> **Methodology for Hackathon Judges:**  
-> The system implements a multi-tiered, explainable AI risk intelligence pipeline that ingests MPLADS project data and computes a unified 0–100 **Composite Risk Score** alongside human-readable audit justifications. It evaluates four core fraud and inefficiency vectors: **(1) Statistical Cost Outlier Modeling** via Isolation Forest combined with peer-group median deviation across work categories and state thresholds; **(2) Ghost & Duplicate Work Prevention** using TF-IDF vectorization and cosine similarity matching on work descriptions grouped per MP constituency; **(3) Visual Compliance Verification** penalizing unverified high-value works lacking mandatory geo-tagged inspection photos; and **(4) Implementing Agency (IDA) Monopoly Detection** flagging disproportionate single-vendor allocation of state works or funds. The model was empirically validated using controlled synthetic anomaly injection, demonstrating a **100% detection rate** on high-risk planted fraud patterns.
+The **MPLADS AI Vigilance Platform** is an enterprise-grade, role-based monitoring and decision support web application designed for government authorities to audit and track MPLADS (Members of Parliament Local Area Development Scheme) works across India.
+
+The platform ingests national project records (43,496 official works across 33 States/UTs) and applies an explainable AI and statistical inference pipeline to detect:
+1. **Severe Cost Inflation & Outliers** via peer-group deviation benchmarks and statistical dispersion modeling across work types and states.
+2. **Execution Delays & Financial Outlay Gaps** identifying projects with milestone overruns or high fund disbursements despite low physical progress.
+3. **Visual Compliance Gaps** flagging high-value works lacking mandatory geo-tagged inspection photos.
+4. **Implementing Agency (IDA) Monopolies** flagging disproportionate single-vendor allocation of state works or funds.
 
 ---
 
-## 🚀 How to Run (Quickstart)
+## 👥 4-Tier Role-Based Dashboards & Workflows
 
-Open two separate terminal windows in the project directory (`mplads_anomaly_detector`):
+The platform provides isolated, tailored intelligence dashboards for four distinct government roles:
 
-### Terminal 1: Start FastAPI Backend
+1. **🏛️ Ministry / Central Government (National Oversight)**
+   - Macro oversight across **33 States/UTs** with aggregated national KPIs (₹2,516+ Cr sanctioned, ₹2,374+ Cr expenditure, 94.4% fund utilization).
+   - National State Ranking Leaderboard and high-risk state triage.
+   - Comprehensive Analytics (work-type distributions, risk band breakdown, and monthly expenditure trends).
+
+2. **🏢 State Nodal Authority**
+   - Inter-district implementation oversight and state-level KPI tracking.
+   - District Performance & Risk Comparison Leaderboard.
+   - Agency monopoly analysis to prevent vendor lock-in.
+
+3. **🏛️ District Authority (District Magistrate / Collector)**
+   - District-wide project execution monitoring, financial ledgers, and milestone verification.
+   - High-risk project inspection queue with direct dossier inspection.
+
+4. **👤 Member of Parliament (MP)**
+   - Constituency-scoped portfolio (e.g. *Dr Sukanta Majumdar - Balurghat*).
+   - Real-time project progress, expenditure tracking, and AI risk warnings for constituency works.
+
+---
+
+## 🔐 Login & Authentication
+
+Access to the platform is role-secured with built-in quick-authentication:
+
+| Field | Default Value |
+| :--- | :--- |
+| **User ID** | `12345` |
+| **Password** | `sih` |
+| **Available Roles** | Ministry / Central Govt, State Nodal Authority, District Authority, MP |
+
+---
+
+## 🧠 Explainable Multi-Factor AI Risk Architecture
+
+Each project is evaluated across three core risk vectors to compute an explainable Composite Risk Score (0–100):
+
+| Risk Dimension | Model / Detection Logic | Weight |
+| :--- | :--- | :--- |
+| **Cost Outlier Risk** | Deviation against work-type median cost and state baseline with Isolation Forest & IQR bounds. | **45%** |
+| **Compliance & Milestone Delay** | Geo-tagged photo verification, schedule overrun tracking, and disproportionate expenditure vs. physical progress. | **40%** |
+| **Agency Monopoly Risk** | Share of works ($\ge 35\%$) and funds awarded to a single Implementing District Agency (IDA). | **15%** |
+
+> **🟢 100% Progress Low-Risk Rule:**  
+> In strict compliance with operational vigilance norms, all projects with **100% physical completion** on schedule are assigned **LOW Risk (≤ 24/100)**. Critical and High-Risk flags are reserved for active milestone overruns, low-progress high-expenditure gaps, and unverified large outlays.
+
+---
+
+## 🗺️ Interactive GIS Map & Spatial Intelligence
+
+- **Dual-Layer Mapping:** Toggle between **Street Map (OpenStreetMap)** and high-resolution **Satellite Imagery (Esri World Imagery)**.
+- **Geocoded Risk Markers:** Pins color-coded by severity (🔴 Critical, 🟠 High, 🟡 Medium, 🟢 Low).
+- **Interactive Inspection Popups:** Click any pin to view physical progress, expenditure, recommending MP, and open full project dossiers.
+- **Auto-Zoom & Center:** Automatically focuses on the active State, District, or MP Constituency.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- **Python 3.10+**
+- **Node.js 18+** & `npm`
+
+### 1. Start the FastAPI Backend
 ```bash
-uvicorn backend.main:app --reload --port 8000
+# From the project root
+uvicorn backend.main:app --host 127.0.0.1 --port 8001 --reload
 ```
-* **API Documentation & Interactive Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-* **Health Check & KPI Endpoint:** [http://127.0.0.1:8000/summary/kpis](http://127.0.0.1:8000/summary/kpis)
+- **Backend API:** [http://127.0.0.1:8001](http://127.0.0.1:8001)
+- **Interactive Swagger Docs:** [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
 
-### Terminal 2: Start Streamlit Frontend Dashboard
+### 2. Start the React Frontend
 ```bash
-streamlit run app/Home.py
+cd frontend
+npm install
+npm run dev -- --port 3000
 ```
-* **Interactive Web App:** [http://localhost:8501](http://localhost:8501)
+- **Web Application:** [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 📂 Project Architecture
+## 📂 Project Structure
 
 ```
 mplads_anomaly_detector/
+├── backend/
+│   ├── main.py                  # FastAPI REST API with role-based scoping & compatibility endpoints
+│   ├── risk_engine.py           # Multi-factor risk scoring engine & data enrichment pipeline
+│   ├── data_loader.py           # Data ingestion & peer-group statistics calculation
+│   └── validate_model.py        # Model validation & benchmark suite
+├── frontend/
+│   ├── src/
+│   │   ├── components/          # Navbar, KPICard, RiskBadge, WorkDetailModal
+│   │   ├── views/               # RoleDashboardView, WorkExplorerView, AlertsView, AnalyticsView, MapView, ReportsView, LoginView
+│   │   ├── services/api.js      # Centralized API service layer
+│   │   └── App.jsx              # Main application shell with authentication state
+│   ├── package.json
+│   └── vite.config.js
 ├── data/
 │   └── processed/
-│       ├── completed_clean.csv          # Base dataset (800+ realistic MPLADS records)
-│       ├── risk_scored_works.csv        # ML-scored output with plain-English reasons
-│       └── model_validation_report.json # Empirical synthetic validation results
-├── backend/
-│   ├── __init__.py
-│   ├── data_loader.py                   # Data ingestion & peer-group statistics calculation
-│   ├── risk_engine.py                   # Isolation Forest, TF-IDF NLP, Agency Concentration
-│   ├── validate_model.py                # Synthetic anomaly injection benchmark module
-│   └── main.py                          # High-performance FastAPI backend with CORS
-├── app/
-│   ├── Home.py                          # National KPI overview & risk distribution charts
-│   ├── utils.py                         # API client, risk badges, color formatting
-│   └── pages/
-│       ├── 1_Ministry_View.py           # National MoSPI ranking & macro trends
-│       ├── 2_State_Nodal_View.py        # State-level drill-down & IDA monopoly audit
-│       ├── 3_District_MP_View.py        # MP constituency portfolio & cost benchmarks
-│       ├── 4_Alerts.py                  # Proactive audit queue with plain-English reasons
-│       └── 5_Model_Validation.py        # Synthetic test results & detection benchmarks
-├── generate_data.py                     # Realistic MPLADS baseline dataset generator
-├── requirements.txt                     # Pinned project dependencies
-└── README.md                            # Comprehensive documentation
+│       ├── completed_clean.csv       # Clean base MPLADS dataset
+│       └── risk_scored_works.csv     # 43,496 AI risk-scored project records
+├── README.md
+└── requirements.txt
 ```
 
 ---
 
-## 🔬 Multi-Factor Risk Scoring Engine
+## 📡 Key REST API Endpoints
 
-| Dimension | AI / Statistical Model | Detection Logic & Anomaly Trigger | Weight |
-| :--- | :--- | :--- | :--- |
-| **Cost Outlier** | **Isolation Forest** + Peer Deviation | Flags works exceeding work-type median by >50% or state median by >75%. | **35%** |
-| **Duplicate Work** | **TF-IDF + Cosine Similarity** | Flags pairs of works with $\ge 75\%$ textual similarity recommended by same MP. | **35%** |
-| **Compliance Gap** | **Boolean Audit Flag** | Flags projects lacking mandatory geo-tagged images (`has_images == False`). | **15%** |
-| **Agency Monopoly**| **Concentration Metric** | Flags IDAs executing $\ge 35\%$ of total state works or sanctioned amounts. | **15%** |
-
-*Note: Compound Multiplier is applied if $\ge 2$ severe anomalies coincide on a single work ID.*
-
----
-
-## 📡 REST API Endpoints
-
-- `GET /summary/kpis`: National overview metrics (works count, outlay, high-risk count).
-- `GET /works`: Filterable works list (`state`, `mp_name`, `work_type`, `risk_category`, `min_risk_score`).
-- `GET /works/{work_id}`: Full work metadata, peer comparisons, and plain-English reasons.
-- `GET /summary/state`: State-wise risk rankings, high-risk counts, and dominant IDAs.
-- `GET /summary/mp`: Constituency-level summary per Member of Parliament.
-- `GET /summary/work_types`: Cost and risk statistics by work category.
-- `GET /summary/ida`: Implementing Agency market concentration breakdown.
-- `GET /alerts`: Top prioritized high-risk audit items.
-- `GET /validation/report`: Empirical validation metrics from synthetic anomaly injection.
-- `POST /recalculate`: On-demand re-execution of the risk scoring pipeline.
+| Endpoint | Description |
+| :--- | :--- |
+| `GET /api/dashboard/summary` | Role-scoped aggregated KPI metrics (sanctioned, expenditure, utilization, counts). |
+| `GET /api/projects` | Filterable, paginated project list with multi-parameter search. |
+| `GET /api/projects/{id}` | Detailed project metadata, timeline, and financial ledger. |
+| `GET /api/projects/{id}/risk` | Explainable AI subscore decomposition and vigilance recommendations. |
+| `GET /api/alerts` | Prioritized AI risk alerts with anomaly categorization and search. |
+| `GET /api/states` | State-level aggregated performance and risk indicators. |
+| `GET /api/districts` | District comparison metrics within a state or nationally. |
+| `GET /api/analytics` | Work-type distribution, risk bands, and monthly financial trends. |
+| `GET /api/map/projects` | Geospatial coordinates and markers for GIS map rendering. |
 
 ---
 
-## 💡 Assumptions and Simplifications
+## 🛡️ License & Compliance
 
-1. **Local Operation:** Runs entirely locally using in-memory pandas caches and CSVs without requiring external cloud databases or paid API keys.
-2. **Peer Group Granularity:** Work types are grouped into 10 standardized categories (`road`, `water_supply`, `street_light`, `drainage`, `education`, `community_hall`, `sanitation`, `healthcare`, `sports`, `other`).
-3. **NLP Deduplication Scope:** Cosine similarity comparison is scoped per MP and constituency to optimize computational efficiency and minimize cross-district false positives.
+Designed and implemented for **Ministry of Statistics and Programme Implementation (MoSPI)** public transparency and MPLADS scheme governance.
