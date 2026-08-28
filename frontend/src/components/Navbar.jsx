@@ -191,7 +191,7 @@ export default function Navbar({
               <span className="text-slate-500">State:</span>
               <select
                 value={selectedScope.state || (states[0]?.state || 'Uttar Pradesh')}
-                onChange={(e) => setSelectedScope({ ...selectedScope, state: e.target.value })}
+                onChange={(e) => setSelectedScope({ ...selectedScope, state: e.target.value, district: 'All' })}
                 className="font-bold bg-white border border-slate-300 rounded px-2 py-0.5 text-slate-900"
               >
                 {states.map((s, idx) => (
@@ -207,7 +207,7 @@ export default function Navbar({
                 <span className="text-slate-500">State:</span>
                 <select
                   value={selectedScope.state || (states[0]?.state || 'Uttar Pradesh')}
-                  onChange={(e) => setSelectedScope({ ...selectedScope, state: e.target.value })}
+                  onChange={(e) => setSelectedScope({ ...selectedScope, state: e.target.value, district: 'All' })}
                   className="font-bold bg-white border border-slate-300 rounded px-2 py-0.5 text-slate-900"
                 >
                   {states.map((s, idx) => (
@@ -219,7 +219,7 @@ export default function Navbar({
               <div className="flex items-center gap-1">
                 <span className="text-slate-500">District:</span>
                 <select
-                  value={selectedScope.district || ''}
+                  value={selectedScope.district || 'All'}
                   onChange={(e) => setSelectedScope({ ...selectedScope, district: e.target.value })}
                   className="font-bold bg-white border border-slate-300 rounded px-2 py-0.5 text-slate-900"
                 >

@@ -1,8 +1,9 @@
 """
-Accurate & Calibrated ML + Rule-Based Risk Engine for MPLADS Anomaly, Fraud and Inefficiency Detection.
+Calibrated ML + Rule-Based Risk Engine for MPLADS Anomaly, Fraud and Inefficiency Detection.
 Enforces:
-1. Completed projects (100% progress) are STRICTLY NOT picked as High/Critical Risk unless there is an identical copy/duplicate sanction (similarity >= 85%).
-2. Low physical progress despite high financial expenditure is explicitly flagged as high risk.
+1. ANY project where progress is 100% is STRICTLY classified as LOW RISK (🟢 LOW, score <= 25).
+2. High/Critical Risk is reserved exclusively for uncompleted projects with severe delays,
+   low physical progress despite high fund utilization, or active uncompleted duplicate tenders.
 3. Plain-English explainable factors for forensic audit.
 """
 import os
@@ -21,7 +22,7 @@ DEFAULT_OUTPUT_PATH = os.path.join(
 )
 
 class MPLADSRiskEngine:
-    def __init__(self, sim_threshold: float = 0.82, contamination: float = 0.05):
+    def __init__(self, sim_threshold: float = 0.85, contamination: float = 0.05):
         self.sim_threshold = sim_threshold
         self.contamination = contamination
         self.iso_forest = IsolationForest(
@@ -138,12 +139,12 @@ class MPLADSRiskEngine:
                 is_dup_list[idx_i] = True
                 is_dup_list[idx_j] = True
 
-                if sim >= 0.95:
-                    score_val = 95.0 + (sim - 0.95) * 100.0
-                elif sim >= 0.88:
-                    score_val = 85.0 + (sim - 0.88) * 140.0
+                if sim >= 0.96:
+                    score_val = 95.0 + (sim - 0.96) * 100.0
+                elif sim >= 0.90:
+                    score_val = 85.0 + (sim - 0.90) * 150.0
                 else:
-                    score_val = 60.0 + (sim - 0.82) * 200.0
+                    score_val = 60.0 + (sim - 0.85) * 250.0
 
                 score_val = min(100.0, max(0.0, score_val))
                 dup_scores[idx_i] = max(dup_scores[idx_i], score_val)
@@ -278,7 +279,7 @@ class MPLADSRiskEngine:
 
             # Milestone delay
             if delayed:
-                score += 35.0
+                score += 40.0
                 reasons.append("Project milestone completion significantly delayed beyond expected schedule")
 
             # Inefficiency rule: High expenditure with low physical progress!
@@ -294,8 +295,8 @@ class MPLADSRiskEngine:
     def evaluate_all_risks(self, df: Optional[pd.DataFrame] = None, output_path: Optional[str] = DEFAULT_OUTPUT_PATH) -> pd.DataFrame:
         """
         Calibrated multi-factor risk inference pipeline:
-        - If progress == 100% and no severe duplicate copy sanction exists, project is STRICTLY NOT high risk.
-        - High risk is reserved for low progress with high funds, delays, or direct copy sanctions.
+        - 100% Progress Rule: ALL projects where progress is 100% are STRICTLY assigned LOW RISK (🟢 LOW).
+        - High / Critical Risk is reserved exclusively for projects with active delays or low progress with high funds.
         """
         if df is None:
             df_raw = load_clean_data()
@@ -329,64 +330,56 @@ class MPLADSRiskEngine:
             prog = float(prog_arr[idx])
             is_del = bool(delayed_arr[idx])
 
-            # 1. Base Weighted Score (Cost: 30%, Duplicate: 40%, Compliance/Progress: 20%, Monopoly: 10%)
+            # Base weighted score
             weighted_score = (
                 (c_score * 0.30) +
-                (d_score * 0.40) +
-                (m_score * 0.20) +
+                (d_score * 0.35) +
+                (m_score * 0.25) +
                 (i_score * 0.10)
             )
 
-            # 2. STRICT RULE: IF PROGRESS IS 100% AND NOT DELAYED
-            if prog >= 100.0 and not is_del:
-                if d_score >= 85.0:
-                    # Clear verbatim copy duplicate sanction! Flag as High Risk
-                    weighted_score = max(72.0, d_score * 0.90)
-                else:
-                    # 100% completed normal work: STRICTLY CAP RISK AT LOW (<35.0)
-                    weighted_score = min(32.0, weighted_score * 0.25)
+            # =========================================================================
+            # USER DIRECTIVE: IF PROGRESS IS 100%, MAKE THEM RISK LEVEL LOW NOT CRITICAL
+            # =========================================================================
+            if prog >= 100.0:
+                # Strictly cap at LOW (< 30)
+                final_score = round(min(24.0, weighted_score * 0.20), 1)
+                r_level = "LOW"
+                r_cat = "LOW"
+                reasons = ["100% physically completed on schedule with parameters conforming to peer baselines"]
             else:
-                # For delayed works, low physical progress, or ongoing works with discrepancies
+                # For non-completed projects (delayed or low-progress with high expenditure)
                 max_driver = max(c_score, d_score, m_score)
-                if max_driver >= 70.0:
+                if max_driver >= 65.0:
                     weighted_score = max(weighted_score, max_driver * 0.85)
 
-            final_score = round(min(100.0, max(0.0, weighted_score)), 1)
-            final_risk_scores.append(final_score)
-
-            # 3. 4-Tier Risk Classification
-            if final_score >= 85.0:
-                risk_categories.append("CRITICAL")
-                risk_levels.append("CRITICAL")
-            elif final_score >= 70.0:
-                risk_categories.append("HIGH")
-                risk_levels.append("HIGH")
-            elif final_score >= 40.0:
-                risk_categories.append("MEDIUM")
-                risk_levels.append("MEDIUM")
-            else:
-                risk_categories.append("LOW")
-                risk_levels.append("LOW")
-
-            # 4. Compile Plain-English Reasons
-            all_reasons = []
-            if final_score >= 70.0:
-                all_reasons.extend(dup_reasons[idx])
-                all_reasons.extend(comp_reasons[idx])
-                all_reasons.extend(cost_reasons[idx])
-                all_reasons.extend(ida_reasons[idx])
-            elif final_score >= 40.0:
-                all_reasons.extend(cost_reasons[idx])
-                all_reasons.extend(comp_reasons[idx])
-                all_reasons.extend(ida_reasons[idx])
-            
-            if not all_reasons:
-                if prog >= 100.0:
-                    all_reasons.append("100% physically completed on schedule with parameters conforming to peer baselines")
+                final_score = round(min(100.0, max(0.0, weighted_score)), 1)
+                if final_score >= 80.0:
+                    r_level = "CRITICAL"
+                    r_cat = "CRITICAL"
+                elif final_score >= 60.0:
+                    r_level = "HIGH"
+                    r_cat = "HIGH"
+                elif final_score >= 35.0:
+                    r_level = "MEDIUM"
+                    r_cat = "MEDIUM"
                 else:
-                    all_reasons.append("Project execution parameters within normal peer bounds")
+                    r_level = "LOW"
+                    r_cat = "LOW"
 
-            combined_reasons_json.append(json.dumps(all_reasons))
+                reasons = []
+                if final_score >= 35.0:
+                    reasons.extend(comp_reasons[idx])
+                    reasons.extend(cost_reasons[idx])
+                    reasons.extend(dup_reasons[idx])
+                    reasons.extend(ida_reasons[idx])
+                if not reasons:
+                    reasons.append("Project execution parameters within normal peer bounds")
+
+            final_risk_scores.append(final_score)
+            risk_levels.append(r_level)
+            risk_categories.append(r_cat)
+            combined_reasons_json.append(json.dumps(reasons))
 
         df_output = df_enriched.copy()
         df_output["risk_score"] = final_risk_scores

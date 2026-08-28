@@ -50,12 +50,12 @@ export default function RoleDashboardView({
 }) {
   const [summary, setSummary] = useState(null);
   const [analytics, setAnalytics] = useState(null);
-  const [highRiskProjects, setHighRiskProjects] = useState([]);
+  const [projectsList, setProjectsList] = useState([]);
   const [statesList, setStatesList] = useState([]);
   const [districtsList, setDistrictsList] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // District Dashboard Filter State
+  // Filters for interactive monitoring table
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [riskFilter, setRiskFilter] = useState('ALL');
@@ -69,22 +69,22 @@ export default function RoleDashboardView({
         fetchAnalytics(currentRole, selectedScope.state, selectedScope.district, selectedScope.mpName),
         fetchProjects({
           role: currentRole,
-          state: selectedScope.state,
-          district: selectedScope.district,
-          mp_name: selectedScope.mpName,
-          risk_level: currentRole === 'district' ? (riskFilter !== 'ALL' ? riskFilter : undefined) : 'HIGH',
-          status: currentRole === 'district' ? (statusFilter !== 'ALL' ? statusFilter : undefined) : undefined,
-          work_type: currentRole === 'district' ? (typeFilter !== 'ALL' ? typeFilter : undefined) : undefined,
-          search: currentRole === 'district' ? (searchFilter || undefined) : undefined,
-          limit: currentRole === 'district' ? 25 : 10
+          state: currentRole === 'ministry' ? undefined : selectedScope.state,
+          district: currentRole === 'district' && selectedScope.district !== 'All' ? selectedScope.district : undefined,
+          mp_name: currentRole === 'mp' ? selectedScope.mpName : undefined,
+          risk_level: riskFilter !== 'ALL' ? riskFilter : undefined,
+          status: statusFilter !== 'ALL' ? statusFilter : undefined,
+          work_type: typeFilter !== 'ALL' ? typeFilter : undefined,
+          search: searchFilter || undefined,
+          limit: 30
         }),
         currentRole === 'ministry' ? fetchStates() : Promise.resolve([]),
-        currentRole === 'state' ? fetchDistricts(selectedScope.state) : Promise.resolve([])
+        (currentRole === 'state' || currentRole === 'district') ? fetchDistricts(selectedScope.state) : Promise.resolve([])
       ]);
 
       setSummary(sumData);
       setAnalytics(analData);
-      setHighRiskProjects(projData?.projects || []);
+      setProjectsList(projData?.projects || []);
       setStatesList(stData || []);
       setDistrictsList(distData || []);
       setLoading(false);
@@ -136,11 +136,11 @@ export default function RoleDashboardView({
           <KPICard title="Total Projects" value={(summary?.total_projects || 0).toLocaleString()} subtitle="Recommended Works" color="blue" />
           <KPICard title="Completed Projects" value={(summary?.completed_projects || 0).toLocaleString()} subtitle="100% Physical Execution" color="emerald" />
           <KPICard title="Ongoing Projects" value={(summary?.ongoing_projects || 0).toLocaleString()} subtitle="Under Implementation" color="purple" />
-          <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Exceeded Completion Target" color="amber" badge="Delayed" />
+          <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Schedule Target" color="amber" badge={summary?.delayed_projects > 0 ? "Delayed" : null} />
           <KPICard title="Sanctioned Amount" value={`₹${summary?.total_sanctioned_crores || 0} Cr`} subtitle="Total Allocation" color="blue" />
           <KPICard title="Total Expenditure" value={`₹${summary?.total_expenditure_crores || 0} Cr`} subtitle="Disbursed Funds" color="emerald" />
           <KPICard title="Fund Utilization" value={`${summary?.fund_utilization_pct || 0}%`} subtitle="Scheme Outlay Ratio" color="blue" />
-          <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Flagged for Verification" color="red" badge="Review" />
+          <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Flagged for Verification" color="red" badge={summary?.high_risk_projects > 0 ? "Review" : null} />
         </div>
 
         {/* Charts Grid */}
@@ -165,12 +165,12 @@ export default function RoleDashboardView({
           {/* Risk Distribution */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
             <h3 className="text-sm font-extrabold text-slate-900 mb-1">Constituency Risk Tier Distribution</h3>
-            <p className="text-xs text-slate-500 mb-4">Breakdown across Low, Medium, High and Critical Risk bands</p>
+            <p className="text-xs text-slate-500 mb-4">Breakdown across Low (🟢 100% Completed), Medium, High and Critical Risk bands</p>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analytics?.risk_distribution || []}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B' }} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748B' }} />
                   <YAxis tick={{ fontSize: 11, fill: '#64748B' }} />
                   <Tooltip contentStyle={{ backgroundColor: '#0F172A', color: '#FFF', borderRadius: '8px', fontSize: '12px' }} />
                   <Bar dataKey="count" fill="#1E3A8A" radius={[4, 4, 0, 0]}>
@@ -184,14 +184,14 @@ export default function RoleDashboardView({
           </div>
         </div>
 
-        {/* High-Risk Projects Table */}
+        {/* Constituency Projects Table */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
-              <span>Constituency High-Risk Projects ({highRiskProjects.length})</span>
+              <Layers className="w-4 h-4 text-purple-600" />
+              <span>Constituency Projects Monitoring Ledger ({projectsList.length})</span>
             </h3>
-            <span className="text-xs text-slate-500">Requires MP Attention & Inspection Review</span>
+            <span className="text-xs text-slate-500">Real-time status and physical verification details</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -204,13 +204,13 @@ export default function RoleDashboardView({
                   <th className="px-4 py-3 text-right">Expenditure</th>
                   <th className="px-4 py-3 text-center">Progress</th>
                   <th className="px-4 py-3 text-center">Risk Level</th>
-                  <th className="px-6 py-3">Main Risk Reason</th>
+                  <th className="px-6 py-3">Status Note</th>
                   <th className="px-4 py-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
-                {highRiskProjects.map((p, idx) => (
-                  <tr key={idx} className="hover:bg-red-50/30 transition-colors">
+                {projectsList.map((p, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-3.5">
                       <div className="font-mono font-bold text-slate-900">#{p.project_id}</div>
                       <div className="line-clamp-1 max-w-xs text-slate-700 font-semibold">{p.project_name}</div>
@@ -221,12 +221,16 @@ export default function RoleDashboardView({
                     </td>
                     <td className="px-4 py-3.5 text-right font-bold">{formatINR(p.sanctioned_amount)}</td>
                     <td className="px-4 py-3.5 text-right font-black text-slate-900">{formatINR(p.expenditure)}</td>
-                    <td className="px-4 py-3.5 text-center font-bold text-emerald-700">{p.progress_pct}%</td>
+                    <td className="px-4 py-3.5 text-center font-bold text-emerald-700">
+                      <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">{p.progress_pct}%</span>
+                    </td>
                     <td className="px-4 py-3.5 text-center whitespace-nowrap">
                       <RiskBadge score={p.risk_score} category={p.risk_level} />
                     </td>
-                    <td className="px-6 py-3.5 text-red-700 font-semibold text-[11px] max-w-xs">
-                      {p.risk_factors?.[0] || 'High multi-factor variance detected'}
+                    <td className="px-6 py-3.5 text-[11px] max-w-xs">
+                      <span className={p.risk_level === 'LOW' ? 'text-emerald-700 font-bold' : 'text-red-700 font-semibold'}>
+                        {p.risk_factors?.[0] || '100% completed on schedule'}
+                      </span>
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <button
@@ -281,17 +285,17 @@ export default function RoleDashboardView({
           <KPICard title="Sanctioned Amount" value={`₹${summary?.total_sanctioned_crores || 0} Cr`} subtitle="Approved Budget" color="blue" />
           <KPICard title="Total Expenditure" value={`₹${summary?.total_expenditure_crores || 0} Cr`} subtitle="Realized Outlay" color="emerald" />
           <KPICard title="Fund Utilization" value={`${summary?.fund_utilization_pct || 0}%`} subtitle="Efficiency Ratio" color="emerald" />
-          <KPICard title="Completed Works" value={(summary?.completed_projects || 0).toLocaleString()} subtitle="100% Milestone" color="purple" />
+          <KPICard title="Completed Works" value={(summary?.completed_projects || 0).toLocaleString()} subtitle="100% Progress (🟢 Low Risk)" color="purple" />
           <KPICard title="Ongoing Works" value={(summary?.ongoing_projects || 0).toLocaleString()} subtitle="Active Execution" color="blue" />
-          <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Schedule Overrun" color="amber" badge="Delayed" />
-          <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Critical Audit Required" color="red" badge="Priority" />
+          <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Schedule Overrun" color="amber" badge={summary?.delayed_projects > 0 ? "Delayed" : null} />
+          <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Critical Audit Required" color="red" badge={summary?.high_risk_projects > 0 ? "Priority" : null} />
         </div>
 
         {/* District Project Monitoring Table with Filters */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4">
           <div className="p-5 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <h3 className="text-sm font-extrabold text-slate-900">District Project Monitoring Workbench</h3>
+              <h3 className="text-sm font-extrabold text-slate-900">District Project Monitoring Workbench ({projectsList.length} Works)</h3>
               <p className="text-xs text-slate-500">Live operational ledger showing financial variances, timeline progress, and AI risk scores</p>
             </div>
 
@@ -304,6 +308,7 @@ export default function RoleDashboardView({
               >
                 <option value="ALL">All Statuses</option>
                 <option value="Completed">Completed</option>
+                <option value="Ongoing">Ongoing</option>
                 <option value="Delayed">Delayed</option>
               </select>
 
@@ -327,10 +332,10 @@ export default function RoleDashboardView({
                 className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg text-slate-700"
               >
                 <option value="ALL">All Risk Tiers</option>
-                <option value="CRITICAL">🔴 Critical (≥85)</option>
-                <option value="HIGH">🟠 High (70-84)</option>
-                <option value="MEDIUM">🟡 Medium (40-69)</option>
-                <option value="LOW">🟢 Low (&lt;40)</option>
+                <option value="CRITICAL">🔴 Critical</option>
+                <option value="HIGH">🟠 High</option>
+                <option value="MEDIUM">🟡 Medium</option>
+                <option value="LOW">🟢 Low (100% Progress)</option>
               </select>
 
               <div className="relative">
@@ -357,14 +362,13 @@ export default function RoleDashboardView({
                   <th className="px-4 py-3 text-right">Estimated Cost</th>
                   <th className="px-4 py-3 text-right">Expenditure</th>
                   <th className="px-4 py-3 text-center">Progress</th>
-                  <th className="px-4 py-3">Start Date</th>
-                  <th className="px-4 py-3">Exp. Completion</th>
+                  <th className="px-4 py-3">Timeline</th>
                   <th className="px-4 py-3 text-center">Risk Level</th>
                   <th className="px-4 py-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
-                {highRiskProjects.map((p, idx) => (
+                {projectsList.map((p, idx) => (
                   <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
                     <td className="px-6 py-3.5 max-w-xs">
                       <div className="font-mono font-bold text-slate-900">#{p.project_id}</div>
@@ -378,11 +382,9 @@ export default function RoleDashboardView({
                     <td className="px-4 py-3.5 text-center">
                       <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">{p.progress_pct}%</span>
                     </td>
-                    <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">{p.start_date || 'N/A'}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className={p.is_delayed ? 'text-red-600 font-bold' : 'text-slate-600'}>
-                        {p.expected_completion_date || 'N/A'} {p.is_delayed && '⚠️'}
-                      </span>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-500 text-[11px]">
+                      <div>Start: {p.start_date || 'N/A'}</div>
+                      <div className={p.is_delayed ? 'text-red-600 font-bold' : ''}>Target: {p.expected_completion_date || 'N/A'}</div>
                     </td>
                     <td className="px-4 py-3.5 text-center whitespace-nowrap">
                       <RiskBadge score={p.risk_score} category={p.risk_level} />
@@ -436,14 +438,14 @@ export default function RoleDashboardView({
 
         {/* 8 Overview Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <KPICard title="Total Districts" value={(summary?.total_districts || 0).toLocaleString()} subtitle="Under State Jurisdiction" color="blue" />
+          <KPICard title="Total Districts" value={(districtsList.length || summary?.total_districts || 0).toLocaleString()} subtitle="Under State Jurisdiction" color="blue" />
           <KPICard title="Total Projects" value={(summary?.total_projects || 0).toLocaleString()} subtitle="Completed & Ongoing" color="blue" />
           <KPICard title="Sanctioned Outlay" value={`₹${summary?.total_sanctioned_crores || 0} Cr`} subtitle="State Sanctions" color="blue" />
           <KPICard title="Total Expenditure" value={`₹${summary?.total_expenditure_crores || 0} Cr`} subtitle="Fund Utilization" color="emerald" />
           <KPICard title="Fund Utilization" value={`${summary?.fund_utilization_pct || 0}%`} subtitle="State Efficiency" color="emerald" />
-          <KPICard title="Completed Projects" value={(summary?.completed_projects || 0).toLocaleString()} subtitle="100% Finished" color="purple" />
-          <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Behind Target" color="amber" badge="Delayed" />
-          <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Vigilance Flags" color="red" badge="Audit" />
+          <KPICard title="Completed Projects" value={(summary?.completed_projects || 0).toLocaleString()} subtitle="100% Progress (🟢 Low Risk)" color="purple" />
+          <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Behind Target" color="amber" badge={summary?.delayed_projects > 0 ? "Delayed" : null} />
+          <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Vigilance Flags" color="red" badge={summary?.high_risk_projects > 0 ? "Audit" : null} />
         </div>
 
         {/* District Comparison Table */}
@@ -532,11 +534,11 @@ export default function RoleDashboardView({
           </div>
           
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
-            National MPLADS Anomaly, Fraud & Inefficiency Monitoring Dashboard
+            National MPLADS AI Monitoring & Vigilance Command Center
           </h1>
           
           <p className="mt-2 text-sm text-blue-100/90 leading-relaxed">
-            Macro oversight of <strong className="text-white">43,496 projects</strong> across <strong className="text-white">33 States/UTs</strong>. 
+            Macro oversight of <strong className="text-white">43,496 official projects</strong> across <strong className="text-white">33 States/UTs</strong>. 
             Drill-down pipeline: <span className="text-amber-300 font-bold">Ministry ➔ State ➔ District ➔ Project</span>.
           </p>
 
@@ -567,9 +569,9 @@ export default function RoleDashboardView({
         <KPICard title="Sanctioned Funds" value={`₹${summary?.total_sanctioned_crores || 0} Cr`} subtitle="Total Allocation" color="blue" />
         <KPICard title="Total Expenditure" value={`₹${summary?.total_expenditure_crores || 0} Cr`} subtitle="Disbursed Funds" color="emerald" />
         <KPICard title="Fund Utilization" value={`${summary?.fund_utilization_pct || 0}%`} subtitle="Overall Efficiency" color="emerald" />
-        <KPICard title="Completed Projects" value={(summary?.completed_projects || 0).toLocaleString()} subtitle="Physically Verified" color="purple" />
-        <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Milestone Overdue" color="amber" badge="Delayed" />
-        <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Vigilance Flags" color="red" badge="Priority" />
+        <KPICard title="Completed Projects" value={(summary?.completed_projects || 0).toLocaleString()} subtitle="100% Progress (🟢 Low Risk)" color="purple" />
+        <KPICard title="Delayed Projects" value={(summary?.delayed_projects || 0).toLocaleString()} subtitle="Milestone Overdue" color="amber" badge={summary?.delayed_projects > 0 ? "Delayed" : null} />
+        <KPICard title="High-Risk Projects" value={(summary?.high_risk_projects || 0).toLocaleString()} subtitle="Vigilance Flags" color="red" badge={summary?.high_risk_projects > 0 ? "Priority" : null} />
       </div>
 
       {/* State Ranking Leaderboard Table */}
@@ -602,7 +604,7 @@ export default function RoleDashboardView({
                 <tr 
                   key={idx} 
                   onClick={() => {
-                    setSelectedScope({ ...selectedScope, state: st.state });
+                    setSelectedScope({ ...selectedScope, state: st.state, district: 'All' });
                     onNavigate('dashboard');
                   }}
                   className="hover:bg-blue-50/40 transition-colors cursor-pointer"
