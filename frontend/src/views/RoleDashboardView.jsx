@@ -66,11 +66,21 @@ export default function RoleDashboardView({
     async function loadData() {
       setLoading(true);
       const [sumData, analData, projData, stData, distData] = await Promise.all([
-        fetchDashboardSummary(currentRole, selectedScope.state, selectedScope.district, selectedScope.mpName),
-        fetchAnalytics(currentRole, selectedScope.state, selectedScope.district, selectedScope.mpName),
+        fetchDashboardSummary(
+          currentRole, 
+          currentRole === 'ministry' ? undefined : (selectedScope.state !== 'National' ? selectedScope.state : undefined), 
+          currentRole === 'district' && selectedScope.district !== 'All' ? selectedScope.district : undefined, 
+          currentRole === 'mp' ? selectedScope.mpName : undefined
+        ),
+        fetchAnalytics(
+          currentRole, 
+          currentRole === 'ministry' ? undefined : (selectedScope.state !== 'National' ? selectedScope.state : undefined), 
+          currentRole === 'district' && selectedScope.district !== 'All' ? selectedScope.district : undefined, 
+          currentRole === 'mp' ? selectedScope.mpName : undefined
+        ),
         fetchProjects({
           role: currentRole,
-          state: currentRole === 'ministry' ? undefined : selectedScope.state,
+          state: currentRole === 'ministry' ? undefined : (selectedScope.state !== 'National' ? selectedScope.state : undefined),
           district: currentRole === 'district' && selectedScope.district !== 'All' ? selectedScope.district : undefined,
           mp_name: currentRole === 'mp' ? selectedScope.mpName : undefined,
           risk_level: riskFilter !== 'ALL' ? riskFilter : undefined,

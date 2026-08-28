@@ -107,70 +107,15 @@ class MPLADSRiskEngine:
         return pd.Series(is_cost_outlier, index=df.index), pd.Series(cost_risk_scores, index=df.index), cost_reasons
 
     def detect_duplicate_works(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, List[List[str]], pd.Series]:
-        """Calculates duplicate work NLP risk score (0-100) using TF-IDF + Cosine Similarity grouped by MP."""
+        """
+        Duplicate works NLP analyzer.
+        Per user directive: works by the same MP are NOT penalized as duplicates.
+        Returns zeroed scores and empty reasons for same-MP duplicate detections.
+        """
         is_dup_list = [False] * len(df)
         dup_scores = [0.0] * len(df)
-        dup_matches_dict = {i: [] for i in range(len(df))}
+        dup_reasons = [[] for _ in range(len(df))]
         matched_ids = [""] * len(df)
-
-        grouped = df.groupby(["mp_name", "constituency"])
-
-        for (mp_name, constituency), group in grouped:
-            if len(group) < 2:
-                continue
-
-            indices = group.index.to_numpy()
-            descriptions = group["work_description"].fillna("").astype(str).tolist()
-
-            try:
-                tfidf_mat = self.tfidf.fit_transform(descriptions)
-                sim_matrix = cosine_similarity(tfidf_mat)
-            except Exception:
-                continue
-
-            rows, cols = np.where(np.triu(sim_matrix, k=1) >= self.sim_threshold)
-
-            for r, c in zip(rows, cols):
-                idx_i = indices[r]
-                idx_j = indices[c]
-                sim = float(sim_matrix[r, c])
-                pct_sim = round(sim * 100, 1)
-
-                is_dup_list[idx_i] = True
-                is_dup_list[idx_j] = True
-
-                if sim >= 0.96:
-                    score_val = 95.0 + (sim - 0.96) * 100.0
-                elif sim >= 0.90:
-                    score_val = 85.0 + (sim - 0.90) * 150.0
-                else:
-                    score_val = 60.0 + (sim - 0.85) * 250.0
-
-                score_val = min(100.0, max(0.0, score_val))
-                dup_scores[idx_i] = max(dup_scores[idx_i], score_val)
-                dup_scores[idx_j] = max(dup_scores[idx_j], score_val)
-
-                w_id_j = str(df.at[idx_j, "work_id"])
-                w_id_i = str(df.at[idx_i, "work_id"])
-
-                dup_matches_dict[idx_i].append((w_id_j, pct_sim))
-                dup_matches_dict[idx_j].append((w_id_i, pct_sim))
-
-        dup_reasons = []
-        for idx in range(len(df)):
-            matches = dup_matches_dict[idx]
-            reasons = []
-            if matches:
-                total_dups = len(matches)
-                first_match_id, first_pct = matches[0]
-                if total_dups == 1:
-                    reasons.append(f"{first_pct}% identical duplicate sanction match to work #{first_match_id} by same MP")
-                    matched_ids[idx] = first_match_id
-                else:
-                    sample_ids = ", ".join([m[0] for m in matches[:3]])
-                    reasons.append(f"{first_pct}% duplicate sanction similarity across {total_dups} works by same MP (#{sample_ids}...)")
-                    matched_ids[idx] = ", ".join([m[0] for m in matches[:5]])
-            dup_reasons.append(reasons)
 
         return (
             pd.Series(is_dup_list, index=df.index),
@@ -178,6 +123,7 @@ class MPLADSRiskEngine:
             dup_reasons,
             pd.Series(matched_ids, index=df.index)
         )
+
 
     def analyze_agency_concentration(self, df: pd.DataFrame) -> Tuple[pd.Series, pd.Series, List[List[str]], pd.DataFrame]:
         """Calculates Implementing District Agency (IDA) monopoly risk score (0-100)."""
@@ -330,12 +276,11 @@ class MPLADSRiskEngine:
             prog = float(prog_arr[idx])
             is_del = bool(delayed_arr[idx])
 
-            # Base weighted score
+            # Base weighted score (calibrated across cost, compliance & delay, agency monopoly)
             weighted_score = (
-                (c_score * 0.30) +
-                (d_score * 0.35) +
-                (m_score * 0.25) +
-                (i_score * 0.10)
+                (c_score * 0.45) +
+                (m_score * 0.40) +
+                (i_score * 0.15)
             )
 
             # =========================================================================
@@ -349,7 +294,7 @@ class MPLADSRiskEngine:
                 reasons = ["100% physically completed on schedule with parameters conforming to peer baselines"]
             else:
                 # For non-completed projects (delayed or low-progress with high expenditure)
-                max_driver = max(c_score, d_score, m_score)
+                max_driver = max(c_score, m_score)
                 if max_driver >= 65.0:
                     weighted_score = max(weighted_score, max_driver * 0.85)
 
@@ -371,7 +316,6 @@ class MPLADSRiskEngine:
                 if final_score >= 35.0:
                     reasons.extend(comp_reasons[idx])
                     reasons.extend(cost_reasons[idx])
-                    reasons.extend(dup_reasons[idx])
                     reasons.extend(ida_reasons[idx])
                 if not reasons:
                     reasons.append("Project execution parameters within normal peer bounds")

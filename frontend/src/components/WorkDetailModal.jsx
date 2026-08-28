@@ -228,24 +228,19 @@ export default function WorkDetailModal({ work, onClose }) {
             </div>
 
             {/* Subscores */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Cost Outlier (35%)</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase">Cost Outlier Risk (45%)</div>
                 <div className="font-black text-slate-900 mt-1">{costScore.toFixed(0)} / 100</div>
               </div>
 
               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Duplicate NLP (35%)</div>
-                <div className="font-black text-purple-800 mt-1">{dupScore.toFixed(0)} / 100</div>
-              </div>
-
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Compliance Proof (15%)</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase">Compliance & Delay Risk (40%)</div>
                 <div className="font-black text-amber-800 mt-1">{compScore.toFixed(0)} / 100</div>
               </div>
 
               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">IDA Monopoly (15%)</div>
+                <div className="text-[10px] text-slate-500 font-bold uppercase">IDA Agency Monopoly (15%)</div>
                 <div className="font-black text-emerald-800 mt-1">{idaScore.toFixed(0)} / 100</div>
               </div>
             </div>

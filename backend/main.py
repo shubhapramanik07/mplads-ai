@@ -90,7 +90,32 @@ def _filter_by_role(df: pd.DataFrame, role: str, state: Optional[str] = None, di
     role = (role or "ministry").strip().lower()
     df_result = df.copy()
 
-    # 1. MP Scope (Match by MP Name or Constituency e.g. Balurghat)
+    # 1. Ministry Scope (National by default)
+    if role == "ministry":
+        if state and state.strip().lower() not in ["all", "national", ""]:
+            st_c = state.strip().lower()
+            df_sub = df_result[df_result["state"].astype(str).str.strip().str.lower() == st_c]
+            if not df_sub.empty:
+                df_result = df_sub
+        if district and district.strip().lower() not in ["all", ""]:
+            dist_c = district.strip().lower()
+            dist_sub = df_result[
+                (df_result["district"].astype(str).str.strip().str.lower() == dist_c) |
+                (df_result["constituency"].astype(str).str.strip().str.lower() == dist_c)
+            ]
+            if not dist_sub.empty:
+                df_result = dist_sub
+        if mp_name and mp_name.strip().lower() not in ["all", ""]:
+            mpc = mp_name.strip().lower()
+            mp_sub = df_result[
+                df_result["mp_name"].astype(str).str.strip().str.lower().str.contains(mpc, na=False) |
+                df_result["constituency"].astype(str).str.strip().str.lower().str.contains(mpc, na=False)
+            ]
+            if not mp_sub.empty:
+                df_result = mp_sub
+        return df_result
+
+    # 2. MP Scope (Match by MP Name or Constituency e.g. Balurghat)
     if role == "mp":
         if mp_name and mp_name.strip().lower() not in ["all", ""]:
             mpc = mp_name.strip().lower()
@@ -106,7 +131,7 @@ def _filter_by_role(df: pd.DataFrame, role: str, state: Optional[str] = None, di
             if not st_match.empty:
                 return st_match
 
-    # 2. District Scope
+    # 3. District Scope
     if role == "district":
         if district and district.strip().lower() not in ["all", ""]:
             dist_c = district.strip().lower()
@@ -123,39 +148,15 @@ def _filter_by_role(df: pd.DataFrame, role: str, state: Optional[str] = None, di
             if not st_match.empty:
                 return st_match
 
-    # 3. State Scope
+    # 4. State Scope
     if role == "state" and state and state.strip().lower() not in ["all", "national", ""]:
         st_c = state.strip().lower()
         st_match = df_result[df_result["state"].astype(str).str.strip().str.lower() == st_c]
         if not st_match.empty:
             return st_match
 
-    # 4. Secondary filters (Ministry or generic query)
-    if state and state.strip().lower() not in ["all", "national", ""]:
-        st_c = state.strip().lower()
-        st_sub = df_result[df_result["state"].astype(str).str.strip().str.lower() == st_c]
-        if not st_sub.empty:
-            df_result = st_sub
-
-    if district and district.strip().lower() not in ["all", ""]:
-        dist_c = district.strip().lower()
-        dist_sub = df_result[
-            (df_result["district"].astype(str).str.strip().str.lower() == dist_c) |
-            (df_result["constituency"].astype(str).str.strip().str.lower() == dist_c)
-        ]
-        if not dist_sub.empty:
-            df_result = dist_sub
-
-    if mp_name and mp_name.strip().lower() not in ["all", ""]:
-        mpc = mp_name.strip().lower()
-        mp_sub = df_result[
-            df_result["mp_name"].astype(str).str.strip().str.lower().str.contains(mpc, na=False) |
-            df_result["constituency"].astype(str).str.strip().str.lower().str.contains(mpc, na=False)
-        ]
-        if not mp_sub.empty:
-            df_result = mp_sub
-
     return df_result
+
 
 # ----------------------------------------------------
 # STANDARD ROLE-BASED ENDPOINTS (/api/...)
@@ -335,7 +336,7 @@ def get_api_alerts(
     district: Optional[str] = Query(None),
     mp_name: Optional[str] = Query(None),
     severity: Optional[str] = Query(None, description="CRITICAL, HIGH, MEDIUM"),
-    alert_type: Optional[str] = Query(None, description="cost_overrun, duplicate, compliance, monopoly"),
+    alert_type: Optional[str] = Query(None, description="cost_overrun, compliance, delay, monopoly"),
     status: Optional[str] = Query(None, description="unresolved, resolved"),
     limit: int = Query(50, ge=1, le=500)
 ):
@@ -351,12 +352,14 @@ def get_api_alerts(
 
     if alert_type and alert_type.lower() != "all":
         at = alert_type.lower()
-        if at == "duplicate":
-            df_scoped = df_scoped[df_scoped["is_duplicate"] == True]
-        elif at == "cost_overrun":
+        if at == "cost_overrun":
             df_scoped = df_scoped[df_scoped["is_cost_outlier"] == True]
         elif at == "compliance":
             df_scoped = df_scoped[df_scoped["has_images"] == False]
+        elif at == "delay":
+            df_scoped = df_scoped[df_scoped["is_delayed"] == True]
+        elif at == "monopoly":
+            df_scoped = df_scoped[df_scoped["is_high_ida_concentration"] == True]
 
     alerts_df = df_scoped.head(limit)
     alerts_list = []
@@ -368,16 +371,16 @@ def get_api_alerts(
         sev = str(rec["risk_level"])
         reasons = rec["risk_factors"]
 
-        if row.get("is_duplicate"):
-            atype_title = "Potential Duplicate Work Claim"
-        elif (row.get("dev_work_type_median_pct") or 0) > 100:
+        if row.get("is_cost_outlier") or (row.get("dev_work_type_median_pct") or 0) > 60:
             atype_title = "Severe Cost Inflation / Overrun"
         elif not row.get("has_images"):
             atype_title = "Visual Compliance Gap / Missing Photos"
+        elif row.get("is_delayed"):
+            atype_title = "Milestone Delay & Schedule Overrun"
         elif row.get("is_high_ida_concentration"):
             atype_title = "IDA Monopoly Concentration Risk"
         else:
-            atype_title = "Milestone Delay & Expenditure Anomaly"
+            atype_title = "Financial Execution Variance Anomaly"
 
         alerts_list.append({
             "alert_id": f"ALT-{wid}",

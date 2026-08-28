@@ -154,9 +154,10 @@ export default function AlertsView({ currentRole, selectedScope, onSelectProject
             className="px-3 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700"
           >
             <option value="ALL">All Anomaly Types</option>
-            <option value="duplicate">Duplicate Work Sanction</option>
             <option value="cost_overrun">Cost Overrun / Outlier</option>
-            <option value="compliance">Missing Geo-Photos</option>
+            <option value="delay">Milestone Delay & Schedule Overrun</option>
+            <option value="compliance">Missing Geo-Photos & Compliance</option>
+            <option value="monopoly">IDA Monopoly Concentration</option>
           </select>
 
           {/* Search Box */}
