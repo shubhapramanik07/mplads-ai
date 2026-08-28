@@ -1,0 +1,187 @@
+{
+  "timestamp": "2026-08-28T03:03:45.846855",
+  "total_test_samples": 211,
+  "total_planted_anomalies": 11,
+  "caught_in_top_15": 10,
+  "caught_in_top_25": 11,
+  "caught_in_high_risk_category": 11,
+  "precision_at_top_15_pct": 66.7,
+  "recall_at_top_25_pct": 100.0,
+  "overall_detection_rate_pct": 100.0,
+  "planted_anomaly_details": [
+    {
+      "work_id": "PLANTED-COST-01",
+      "planted_type": "Extreme Cost Outlier",
+      "description": "\u20b948.5L billed for 10 LED street lights (8x peer median)",
+      "expected": "Cost Outlier / High Risk",
+      "predicted_score": 78.7,
+      "predicted_category": "HIGH",
+      "rank": 19,
+      "reasons": [
+        "Severe price inflation: Cost is +1926.3% above national peer median for 'street_light' works",
+        "Cost is +1914.0% above overall state median expenditure in Uttar Pradesh",
+        "Near-maximum ceiling allocation of \u20b94,850,000"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-COST-02",
+      "planted_type": "Extreme Cost Outlier",
+      "description": "\u20b942L billed for 2 water booths (5x peer median)",
+      "expected": "Cost Outlier / High Risk",
+      "predicted_score": 96.3,
+      "predicted_category": "HIGH",
+      "rank": 11,
+      "reasons": [
+        "Severe price inflation: Cost is +1948.2% above national peer median for 'water_supply' works",
+        "Cost is +320.8% above overall state median expenditure in Maharashtra",
+        "Monopoly concentration risk: IDA controls 14.3% of works (43.9% of funds) in Maharashtra"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-DUP-01A",
+      "planted_type": "Duplicate Work (Pair A)",
+      "description": "Identical CC Road description & location billed twice within 3 months",
+      "expected": "Near-Duplicate Work / High Risk",
+      "predicted_score": 100.0,
+      "predicted_category": "HIGH",
+      "rank": 8,
+      "reasons": [
+        "Severe price inflation: Cost is +270.0% above national peer median for 'road' works",
+        "Cost is +668.2% above overall state median expenditure in Uttar Pradesh",
+        "100.0% textual duplication match to work #PLANTED-DUP-01B by same MP"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-DUP-01B",
+      "planted_type": "Duplicate Work (Pair B)",
+      "description": "Identical CC Road description & location billed twice within 3 months",
+      "expected": "Near-Duplicate Work / High Risk",
+      "predicted_score": 100.0,
+      "predicted_category": "HIGH",
+      "rank": 4,
+      "reasons": [
+        "Severe price inflation: Cost is +280.0% above national peer median for 'road' works",
+        "Cost is +689.0% above overall state median expenditure in Uttar Pradesh",
+        "100.0% textual duplication match to work #PLANTED-DUP-01A by same MP"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-DUP-02A",
+      "planted_type": "Near-Duplicate Work",
+      "description": "95%+ identical solar tower work description in same constituency",
+      "expected": "Near-Duplicate Work / High Risk",
+      "predicted_score": 100.0,
+      "predicted_category": "HIGH",
+      "rank": 7,
+      "reasons": [
+        "Severe price inflation: Cost is +296.9% above national peer median for 'street_light' works",
+        "91.7% textual duplication match to work #PLANTED-DUP-02B by same MP",
+        "Acute agency monopoly: IDA controls 50.0% of works (65.9% of funds) in Karnataka"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-DUP-02B",
+      "planted_type": "Near-Duplicate Work",
+      "description": "95%+ identical solar tower work description in same constituency",
+      "expected": "Near-Duplicate Work / High Risk",
+      "predicted_score": 100.0,
+      "predicted_category": "HIGH",
+      "rank": 2,
+      "reasons": [
+        "Severe price inflation: Cost is +309.4% above national peer median for 'street_light' works",
+        "91.7% textual duplication match to work #PLANTED-DUP-02A by same MP",
+        "Acute agency monopoly: IDA controls 50.0% of works (65.9% of funds) in Karnataka"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-DOC-01",
+      "planted_type": "High-Value Missing Documentation",
+      "description": "Maximum ceiling community hall \u20b949L with zero geo-tagged proof",
+      "expected": "Compliance & Cost Anomaly / High Risk",
+      "predicted_score": 93.8,
+      "predicted_category": "HIGH",
+      "rank": 12,
+      "reasons": [
+        "Severe price inflation: Cost is +880.0% above national peer median for 'community_hall' works",
+        "Cost is +478.5% above overall state median expenditure in Bihar",
+        "Near-maximum ceiling allocation of \u20b94,900,000",
+        "High-value project (\u20b94,900,000) lacking mandatory geo-tagged inspection photos",
+        "Elevated single-agency concentration: 6.2% of state works"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-MULTI-01",
+      "planted_type": "Multi-Factor Severe Fraud",
+      "description": "Cost 350% above peer median + Duplicate Work + Zero Images + Monopolized IDA",
+      "expected": "Critical Multi-Factor Anomaly (Score 90-100)",
+      "predicted_score": 100.0,
+      "predicted_category": "HIGH",
+      "rank": 6,
+      "reasons": [
+        "Cost is +204.2% above overall state median expenditure in Rajasthan",
+        "Near-maximum ceiling allocation of \u20b94,500,000",
+        "100.0% textual duplication match to work #PLANTED-MULTI-01B by same MP",
+        "High-value project (\u20b94,500,000) lacking mandatory geo-tagged inspection photos",
+        "Acute agency monopoly: IDA controls 33.3% of works (71.5% of funds) in Rajasthan"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-MULTI-01B",
+      "planted_type": "Multi-Factor Severe Fraud",
+      "description": "Cost 350% above peer median + Duplicate Work + Zero Images + Monopolized IDA",
+      "expected": "Critical Multi-Factor Anomaly (Score 90-100)",
+      "predicted_score": 100.0,
+      "predicted_category": "HIGH",
+      "rank": 3,
+      "reasons": [
+        "Cost is +197.4% above overall state median expenditure in Rajasthan",
+        "100.0% textual duplication match to work #PLANTED-MULTI-01 by same MP",
+        "High-value project (\u20b94,400,000) lacking mandatory geo-tagged inspection photos",
+        "Acute agency monopoly: IDA controls 33.3% of works (71.5% of funds) in Rajasthan"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-COST-03",
+      "planted_type": "Extreme Cost Outlier",
+      "description": "Drainage work cost inflated to \u20b946.5L (3.5x normal)",
+      "expected": "Cost Outlier / High Risk",
+      "predicted_score": 91.5,
+      "predicted_category": "HIGH",
+      "rank": 13,
+      "reasons": [
+        "Elevated expenditure: Cost is +80.6% above peer median for 'drainage' works",
+        "Cost is +1895.7% above overall state median expenditure in Madhya Pradesh",
+        "Near-maximum ceiling allocation of \u20b94,650,000",
+        "Monopoly concentration risk: IDA controls 5.9% of works (43.9% of funds) in Madhya Pradesh"
+      ],
+      "is_detected_high_risk": true
+    },
+    {
+      "work_id": "PLANTED-DOC-02",
+      "planted_type": "High-Value Missing Documentation",
+      "description": "Hospital ambulance procurement of \u20b947L with no asset verification",
+      "expected": "Compliance & Cost Anomaly / High Risk",
+      "predicted_score": 100.0,
+      "predicted_category": "HIGH",
+      "rank": 1,
+      "reasons": [
+        "Elevated expenditure: Cost is +80.8% above peer median for 'healthcare' works",
+        "Cost is +1767.3% above overall state median expenditure in Gujarat",
+        "Near-maximum ceiling allocation of \u20b94,700,000",
+        "High-value project (\u20b94,700,000) lacking mandatory geo-tagged inspection photos",
+        "Acute agency monopoly: IDA controls 5.9% of works (50.8% of funds) in Gujarat"
+      ],
+      "is_detected_high_risk": true
+    }
+  ],
+  "summary": "The MPLADS Risk Engine successfully detected 11/11 (100.0%) planted anomalies as HIGH RISK, with a Precision@15 of 66.7% and Recall@25 of 100.0%."
+}
