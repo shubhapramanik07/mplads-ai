@@ -29,6 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def _clean_record(row_dict: dict) -> dict:
     """Helper to parse JSON fields and format datatypes cleanly and safely."""
     cleaned = {}
@@ -743,3 +744,9 @@ def get_alerts_compat(
         "returned": res["returned"],
         "alerts": res["alerts"]
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8001, reload=False)
