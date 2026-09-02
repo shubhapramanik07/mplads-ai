@@ -113,9 +113,6 @@ export default function App() {
         setCurrentRole={(newRole) => {
           setCurrentRole(newRole);
           sessionStorage.setItem('mplads_role', newRole);
-          if (newRole !== 'ministry' && activeNav === 'analytics') {
-            setActiveNav('dashboard');
-          }
         }}
         selectedScope={selectedScope}
         setSelectedScope={(newScope) => {
@@ -164,7 +161,7 @@ export default function App() {
           />
         )}
 
-        {activeNav === 'analytics' && currentRole === 'ministry' && (
+        {activeNav === 'analytics' && (
           <AnalyticsView 
             currentRole={currentRole}
             selectedScope={selectedScope}

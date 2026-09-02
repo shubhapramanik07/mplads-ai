@@ -42,12 +42,11 @@ export default function Navbar({
     { id: 'mp', label: 'Member of Parliament', subtitle: 'Constituency Work Monitoring', icon: UserCheck, color: 'bg-purple-600' },
   ];
 
-  // User Requirement: "remove analytics from all except ministry"
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'projects', label: 'Projects', icon: FolderGit2 },
     { id: 'alerts', label: 'AI Alerts', icon: AlertTriangle, badge: alertCount > 0 ? `${alertCount}` : null },
-    ...(currentRole === 'ministry' ? [{ id: 'analytics', label: 'Analytics', icon: LineChart }] : []),
+    { id: 'analytics', label: 'Analytics', icon: LineChart },
     { id: 'map', label: 'Project Map', icon: MapPin },
     { id: 'reports', label: 'Reports', icon: FileSpreadsheet },
   ];
