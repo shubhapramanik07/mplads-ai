@@ -8,6 +8,7 @@ import AlertsView from './views/AlertsView';
 import AnalyticsView from './views/AnalyticsView';
 import MapView from './views/MapView';
 import ReportsView from './views/ReportsView';
+import AuthorityAssistant from './components/AuthorityAssistant';
 import { fetchStates, fetchDistricts, fetchMPSummaries, fetchApiAlerts } from './services/api';
 import { ExternalLink } from 'lucide-react';
 
@@ -188,6 +189,11 @@ export default function App() {
       <WorkDetailModal 
         work={inspectedProject} 
         onClose={() => setInspectedProject(null)} 
+      />
+
+      <AuthorityAssistant
+        currentRole={currentRole}
+        selectedScope={selectedScope}
       />
 
       {/* Official Government Scheme Footer */}
