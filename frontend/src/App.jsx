@@ -197,15 +197,17 @@ export default function App() {
       <footer className="bg-gov-navy text-white border-t border-slate-800 mt-12 py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-900 flex items-center justify-center font-black">
-              GOI
-            </div>
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg"
+              alt="Ashoka Stambh, Government of India emblem"
+              className="w-9 h-11 object-contain brightness-0 invert"
+            />
             <div>
               <div className="font-extrabold text-sm text-slate-100">
-                MPLADS AI Monitoring & Decision Support Platform
+                Government of India | Official MPLADS Portal
               </div>
               <div className="text-slate-400">
-                Ministry of Statistics and Programme Implementation (MoSPI) • Government of India
+                Ministry of Statistics and Programme Implementation (MoSPI) | AI Monitoring & Decision Support Platform
               </div>
             </div>
           </div>
