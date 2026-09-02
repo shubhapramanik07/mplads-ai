@@ -1,3 +1,4 @@
+import AshokStambha from '../assets/ashoka1.png';
 import React, { useState } from 'react';
 import { 
   ShieldCheck, 
@@ -146,44 +147,38 @@ export default function LoginView({ onLogin, states = [], mps = [] }) {
             <div className="relative z-10 space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-xs font-bold backdrop-blur-xs border border-white/10">
                 <ShieldCheck className="w-4 h-4" />
-                <span>Government of India • MoSPI</span>
+                <span>Government of India • MoSPI • MPLADS</span>
               </div>
 
               <div>
                 <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">
-                  e-SAKSHI MPLADS AI Vigilance Portal
+                  MPLADS e-Connect
                 </h2>
                 <p className="text-xs text-blue-100/90 mt-2 leading-relaxed">
                   Centralized decision support system for anomaly detection, fund utilization monitoring, and fraud prevention across all 43,496 MPLADS scheme works.
                 </p>
               </div>
-
-              {/* Security Features List */}
-              <div className="space-y-2 pt-3 text-xs border-t border-white/10">
-                <div className="flex items-center gap-2 text-blue-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Strict Authority Scope Isolation</span>
-                </div>
-                <div className="flex items-center gap-2 text-blue-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Interactive Street & Satellite GIS Map</span>
-                </div>
-                <div className="flex items-center gap-2 text-blue-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>100% Progress Works Verified Low Risk</span>
-                </div>
-              </div>
             </div>
 
-            {/* Quick Demo Credentials Info */}
-            <div className="relative z-10 mt-6 bg-white/10 rounded-2xl p-4 border border-white/15 backdrop-blur-xs">
-              <div className="text-[11px] font-extrabold text-amber-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <KeyRound className="w-3.5 h-3.5" /> Demo Login Credentials:
+            {/* Government Identity */}
+            <div className="relative z-10 mt-8 flex items-center gap-1">
+
+             <img
+                  src={AshokStambha}
+                  alt="Ashoka Stambha"
+                  className="w-16 h-18 object-contain shrink-0"
+                  /> 
+
+              <div className="leading-tight">
+                <div className="text-sm font-extrabold text-white">
+                   Ministry of Statistics and Programme Implementation
+                </div>
+
+                <div className="text-xs text-blue-100 mt-0.5">
+                  Members of Parliament Local Area Development Scheme
+                </div>
               </div>
-              <div className="text-xs space-y-0.5 text-blue-100 font-mono">
-                <div>User ID: <strong className="text-white">12345</strong></div>
-                <div>Password: <strong className="text-white">sih</strong></div>
-              </div>
+
             </div>
           </div>
 
