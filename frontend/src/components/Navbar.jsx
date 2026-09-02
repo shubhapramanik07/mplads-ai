@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  ShieldCheck, 
   BarChart3, 
   FolderGit2, 
   AlertTriangle, 
@@ -74,20 +73,17 @@ export default function Navbar({
       {/* Top Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
         
-        {/* Left: Emblem & App Title */}
+        {/* Left: Government emblem and ministry identity */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-10 h-10 rounded-lg bg-gov-navy text-white flex items-center justify-center shadow-md">
-            <ShieldCheck className="w-6 h-6 text-amber-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-extrabold tracking-wider text-gov-saffron uppercase">GOVERNMENT OF INDIA</span>
-              <span className="text-slate-300">•</span>
-              <span className="text-[10px] font-semibold text-slate-500">MoSPI (e-SAKSHI)</span>
-            </div>
-            <h1 className="text-base sm:text-lg font-black text-gov-navy flex items-center gap-2">
-              MPLADS <span className="bg-blue-100 text-blue-900 text-xs px-2 py-0.5 rounded font-extrabold">AI Vigilance Platform</span>
-            </h1>
+          <img
+            src="https://upload.wikimedia.org/wikipedia/commons/5/55/Emblem_of_India.svg"
+            alt="Ashoka Stambh, Government of India emblem"
+            className="w-10 h-12 object-contain"
+          />
+          <div className="leading-tight">
+            <div className="text-[10px] sm:text-xs font-medium text-slate-600">Government of India</div>
+            <div className="text-xs sm:text-sm font-extrabold text-gov-navy">Ministry of Statistics and Programme Implementation</div>
+            <h1 className="text-xs sm:text-sm font-extrabold text-gov-navy">Members of Parliament Local Area Development Scheme</h1>
           </div>
         </div>
 
